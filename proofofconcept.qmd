@@ -1,9 +1,21 @@
 ---
 title: "Lighthouse Proof of Concept"
-author: "Elena Richert"
-format: html
+author: 
+  - Elena Richert
+  - Lukas Röseler
+date: "`r Sys.Date()`"
+format:
+  html:
+    embed-resources: true
 editor: visual
 ---
+
+```{r setup, include=F, warning=F, message=F}
+library(dplyr)
+library(glue)
+library(readr)
+
+```
 
 ## Quarto
 
@@ -25,3 +37,47 @@ You can add options to executable code like this
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
+
+```{r download data}
+
+# lighthouse data
+lh_link <- "https://docs.google.com/spreadsheets/d/1gUBU8s2de3nRVO9bHi3EJYMllcFR-MQ9Uyni1SPlEns/edit?gid=0#gid=0"
+lh_link <- "https://spreadsheets.google.com/feeds/download/spreadsheets/Export?key=1gUBU8s2de3nRVO9bHi3EJYMllcFR-MQ9Uyni1SPlEns&exportFormat=xlsx"
+lh <- openxlsx::read.xlsx(lh_link, sheet = "Effects Summaries")
+```
+
+<details>
+
+<summary>Example for ausklabbable Statistics Dingens</summary>
+
+`r mean(c(1:100))`
+
+</details>
+
+```{r reversals test}
+
+lh %>%
+  group_by(discipline) %>%
+  summarise(
+    html_section = paste0(
+      '<div class="effect">\n',
+      '  <h3>', effect.original, '</h3>\n',
+      '  <p>', description, '</p>\n',
+      '</div>\n',
+      collapse = "\n"
+    )
+  ) %>%
+  rowwise() %>%
+  mutate(
+    block = paste0(
+      '<div class="discipline">\n\n',
+      '<h2>', discipline, '</h2>\n\n',
+      html_section,
+      '\n</div>\n'
+    )
+  ) %>%
+  pull(block) %>%
+  cat(sep = "\n")
+		
+
+```
