@@ -1,0 +1,86 @@
+---
+title: "Lighthouse PoC"
+author: 
+  - Elena Richert
+  - Lukas Röseler
+date: "`r Sys.Date()`"
+type: plain_page
+always_allow_html: true
+output:
+  html_document:
+    self_contained: false       # don’t inline – write out .js/.css
+    keep_md:     true           # keep the .md
+    lib_dir:     "htmlwidgets_libs"  # where to drop htmlwidgets.js & visNetwork deps
+editor: visual
+---
+
+```{r setup, include=F, warning=F, message=F}
+library(dplyr)
+library(glue)
+library(readr)
+library(purrr)
+
+# comment this out in the end when everything is running smoothly
+# knitr::opts_chunk$set(
+#   echo = FALSE, warning = FALSE, message = FALSE, fig.path = ""
+# )
+
+```
+
+Test for folding menu
+
+<details>
+
+<summary>Example for ausklabbable Statistics Dingens</summary>
+
+`r mean(c(1:100))`
+
+</details>
+
+```{r download data, incldue = FALSE}
+
+# lighthouse data
+lh_link <- "https://docs.google.com/spreadsheets/d/1gUBU8s2de3nRVO9bHi3EJYMllcFR-MQ9Uyni1SPlEns/edit?gid=0#gid=0"
+lh_link <- "https://spreadsheets.google.com/feeds/download/spreadsheets/Export?key=1gUBU8s2de3nRVO9bHi3EJYMllcFR-MQ9Uyni1SPlEns&exportFormat=xlsx"
+lh <- openxlsx::read.xlsx(lh_link, sheet = "Effects Summaries")
+
+# FRiDa (preliminary double-coded and validated FReD COS version)
+
+frida_link <- "https://github.com/forrtproject/FReD-data/raw/refs/heads/main/2025-07-01_COSdata_validated.xlsx"
+frida <- openxlsx::read.xlsx(frida_link)
+
+```
+
+```{r build summaries}
+
+# Group by discipline (in case you have more than one)
+# lh %>%
+#   group_by(discipline) %>%
+#   do({
+#     disc <- unique(.$discipline)
+#     cat(sprintf("**%s**\n\n", disc))    # Bold header
+#     
+#     # Now, for each row (effect.original + description as list)
+#     for (i in seq_len(nrow(.))) {
+#       effect <- .$effect.original[i]
+#       desc <- .$description[i]
+#       # bullet point with effect and desc
+#       cat(sprintf("- %s. %s\n", effect, desc))
+#     }
+#     cat("\n")  # Blank line after each discipline section
+#     data.frame() # require some output for do()
+#   })
+
+
+lh %>%
+  group_split(discipline) %>%
+  walk(function(df) {
+    # Print discipline as a bold header
+    cat(sprintf("**%s**\n\n", df$discipline[1]))
+    # Pretty bullet list with bolded effect name and indented description
+    walk2(df$effect.original, df$description, function(effect, desc) {
+      cat(sprintf("- __%s__  \n  %s\n\n", effect, desc))
+    })
+    cat("\n")
+  })
+```
