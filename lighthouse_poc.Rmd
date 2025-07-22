@@ -1,16 +1,17 @@
 ---
 title: "Lighthouse PoC"
-author: 
-  - Elena Richert
-  - Lukas Röseler
-date: "`r Sys.Date()`"
-type: plain_page
-always_allow_html: true
+author:
+- Elena Richert
+- Lukas Röseler
+date: '`r Sys.Date()`'
 output:
   html_document:
-    self_contained: false       # don’t inline – write out .js/.css
-    keep_md:     true           # keep the .md
-    lib_dir:     "htmlwidgets_libs"  # where to drop htmlwidgets.js & visNetwork deps
+    self_contained: false
+    keep_md: true
+    lib_dir: htmlwidgets_libs
+  pdf_document: default
+always_allow_html: true
+type: plain_page
 editor: visual
 ---
 
@@ -43,6 +44,8 @@ Test for folding menu
 lh_link <- "https://docs.google.com/spreadsheets/d/1gUBU8s2de3nRVO9bHi3EJYMllcFR-MQ9Uyni1SPlEns/edit?gid=0#gid=0"
 lh_link <- "https://spreadsheets.google.com/feeds/download/spreadsheets/Export?key=1gUBU8s2de3nRVO9bHi3EJYMllcFR-MQ9Uyni1SPlEns&exportFormat=xlsx"
 lh <- openxlsx::read.xlsx(lh_link, sheet = "Effects Summaries")
+lh_comments <- openxlsx::read.xlsx(lh_link, sheet = "Comments and MAs")
+lh_joined <- lh %>% left_join(lh_comments, by = 'effect.original')
 
 # FRiDa (preliminary double-coded and validated FReD COS version)
 
@@ -72,14 +75,20 @@ frida <- openxlsx::read.xlsx(frida_link)
 #   })
 
 
-lh %>%
+lh_joined %>%
   group_split(discipline) %>%
   walk(function(df) {
     # Print discipline as a bold header
     cat(sprintf("**%s**\n\n", df$discipline[1]))
     # Pretty bullet list with bolded effect name and indented description
-    walk2(df$effect.original, df$description, function(effect, desc) {
-      cat(sprintf("- __%s__  \n  %s\n\n", effect, desc))
+    walk2(df$effect.original, df$description, function(effect, description) {
+      #include reference from Comments and MA sheet. If empty, show [tba]
+      ref_c <- df$reference[df$effect.original == effect][1]
+      ref_c_txt <- if (!is.na(ref_c) && ref_c != "") ref_c else "[tba]"
+      
+cat(sprintf(
+  "### %s\n\n**Description**: %s\n\n**Original Study**: [to be added]\n\n**Replication Study**: [to be added]\n\n**Comments and MAs**: %s\n\n---\n\n",
+  effect, description, ref_c_txt))
     })
     cat("\n")
   })
