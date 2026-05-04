@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FORRT Lighthouse</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="app">
+  <header id="header">
+    <div id="logo-wrap">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style="flex-shrink:0">
+        <circle cx="11" cy="11" r="10" stroke="currentColor" stroke-width="1.5" opacity=".4"/>
+        <circle cx="11" cy="7" r="3" fill="currentColor"/>
+        <line x1="11" y1="10" x2="11" y2="18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="7" y1="14" x2="15" y2="14" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity=".5"/>
+      </svg>
+      <span class="logo-text">FORRT <strong>Lighthouse</strong></span>
+    </div>
+    <div id="breadcrumb"></div>
+    <div id="header-right">
+      <div id="search-wrap">
+        <input id="search-input" type="text" placeholder="Search effects…" autocomplete="off">
+        <div id="search-results"></div>
+      </div>
+      <button id="theme-toggle" aria-label="Toggle theme" title="Toggle dark/light mode">
+        <svg id="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="8" y1="1" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15"/><line x1="1" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15" y2="8"/><line x1="3.1" y1="3.1" x2="4.2" y2="4.2"/><line x1="11.8" y1="11.8" x2="12.9" y2="12.9"/><line x1="12.9" y1="3.1" x2="11.8" y2="4.2"/><line x1="4.2" y1="11.8" x2="3.1" y2="12.9"/></g></svg>
+        <svg id="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:none"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" fill="currentColor"/></svg>
+      </button>
+      <button id="back-btn" class="btn-back" style="display:none">← Back</button>
+    </div>
+  </header>
+
+  <div id="legend">
+    <div class="leg-group">
+      <span class="leg-label">Papers:</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#185FA5"></span>Foundational</span>
+      <span class="leg-item"><span class="leg-dot leg-circle" style="border-color:#0F6E56"></span>Critique</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#534AB7"></span>Meta-analysis</span>
+    </div>
+    <div class="leg-group">
+      <span class="leg-label">Status:</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#2d9b5c"></span>Replicated</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#e05c30"></span>Not replicated</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#c49a00"></span>Mixed</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#993556"></span>Reversed</span>
+    </div>
+  </div>
+
+  <div id="stage">
+    <svg id="net-svg"></svg>
+    <div id="timeline-panel">
+      <div id="tl-header">
+        <div>
+          <h3 id="tl-title"></h3>
+          <div id="tl-status-badge"></div>
+          <p id="tl-desc"></p>
+        </div>
+        <button id="tl-close" aria-label="Close">×</button>
+      </div>
+      <div id="tl-body"></div>
+    </div>
+    <div id="hint">Click a discipline to explore</div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
