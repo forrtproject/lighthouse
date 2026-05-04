@@ -115,21 +115,29 @@ function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', statusColor
   const fillColor = dark ? hexAlpha(color, 0.35) : hexAlpha(color, 0.18);
   const strokeColor = color;
 
-  const circle = makeSvgEl('circle', {
-    class:'nbg', r, fill: fillColor, stroke: strokeColor,
+  // Rounded rectangle: width driven by longest label line, height by r
+  const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, '');
+  const rw = Math.max(r * 2, longestLine.length * fs * 0.62 + 14);
+  const rh = r * 2;
+  const cornerR = Math.round(r * 0.35);
+
+  const rect = makeSvgEl('rect', {
+    class:'nbg', x:-rw/2, y:-rh/2, width:rw, height:rh, rx:cornerR,
+    fill: fillColor, stroke: strokeColor,
     'stroke-width': kind==='anchor' ? '1.2' : '1.5',
     'fill-opacity': kind==='anchor' ? '0.6' : '1',
   });
-  g.appendChild(circle);
+  g.appendChild(rect);
 
-  // Status ring (outer)
+  // Status ring (outer rounded rect)
   if (statusColor && kind !== 'anchor') {
-    const ring = makeSvgEl('circle', {
-      r: r + 5, fill: 'none',
-      stroke: statusColor, 'stroke-width': '2',
-      'stroke-opacity': '0.5', 'stroke-dasharray': '3 3',
+    const pad = 5;
+    const ring = makeSvgEl('rect', {
+      x:-(rw/2+pad), y:-(rh/2+pad), width:rw+pad*2, height:rh+pad*2, rx:cornerR+pad,
+      fill: 'none', stroke: statusColor, 'stroke-width': '2',
+      'stroke-opacity': '0.5', 'stroke-dasharray': '4 3',
     });
-    g.insertBefore(ring, circle);
+    g.insertBefore(ring, rect);
   }
 
   const lh = (fs + 3.5);
@@ -215,18 +223,17 @@ function spawnNode(nodeEl, fromX, fromY, toX, toY, toR, delay) {
     nodeEl.style.transition = 'opacity .25s';
     nodeEl.style.opacity = '1';
     animate(nodeEl, { tx:[fromX,toX], ty:[fromY,toY] }, 540, 0);
+    // Scale shape from tiny to full size
     const c = nodeEl.querySelector('.nbg');
     if (c) {
-      const currentR = parseFloat(c.getAttribute('r'));
-      animate({ querySelector:()=>c, setAttribute:(k,v)=>c.setAttribute(k,v) },
-        { r:[4, toR] }, 540, 0);
-      // direct:
-      let s = performance.now();
       const ease = t => t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+      const s = performance.now();
       (function step(now) {
         const tt = Math.min(1,(now-s)/540); const e=ease(tt);
-        c.setAttribute('r', 4+(toR-4)*e);
+        const sc = 0.1 + 0.9*e;
+        c.setAttribute('transform', `scale(${sc})`);
         if(tt<1) requestAnimationFrame(step);
+        else c.removeAttribute('transform');
       })(s);
     }
   }, delay);
@@ -358,7 +365,6 @@ async function renderEffectsInSub() {
 }
 
 function drawEffectsLayout(effects, anchorLabel) {
-  const fieldColor = getDiscColor(state.field);
   const discColor = getDiscColor(state.disc||state.field);
 
   // Discipline anchor
@@ -373,34 +379,67 @@ function drawEffectsLayout(effects, anchorLabel) {
   setTimeout(()=>{ dAnchor.style.transition='opacity .3s'; dAnchor.style.opacity='1'; },20);
   liveNodes.set('__disc__', { el:dAnchor, x:dAnchorX, y:dAnchorY, r:30, color:discColor });
 
-  const baseX = (document.getElementById('timeline-panel').classList.contains('open') ? VW-380 : VW) * 0.52;
+  const tlOpen = document.getElementById('timeline-panel').classList.contains('open');
+  const rightEdge = tlOpen ? VW - 400 : VW - 20;
+  const leftEdge  = dAnchorX + 90;
   const n = effects.length;
-  const effectsPerCol = Math.ceil(n / (n > 20 ? 2 : 1));
-  const colW = n > 20 ? 200 : 0;
-  const spread = Math.min(VH * 0.88, effectsPerCol * 44);
-  const startY = VH/2 - spread/2;
+
+  // Adaptive layout: scale columns, radius, font, and wrap width with effect count
+  const numCols = n > 100 ? 6 : n > 70 ? 5 : n > 40 ? 4 : n > 20 ? 3 : n > 10 ? 2 : 1;
+  const baseR   = n > 100 ? 14 : n > 70 ? 15 : n > 40 ? 18 : n > 20 ? 22 : n > 10 ? 26 : 30;
+  const nodeFs  = n > 70  ? 8  : n > 30  ? 9  : 10;
+  const wrapCh  = n > 70  ? 9  : n > 30  ? 11 : 13;
+  const lh      = nodeFs + 3;
+  // Max lines that can fit inside baseR without overflow
+  const maxLines = Math.max(1, Math.floor((baseR * 2 - 6) / lh));
+
+  const effectsPerCol = Math.ceil(n / numCols);
+  const rowSpacing    = baseR * 2 + 8;
+  const spread        = Math.min(VH * 0.9, effectsPerCol * rowSpacing);
+  const startY        = VH / 2 - spread / 2;
+
+  // Distribute columns evenly across available horizontal space
+  const colW   = (rightEdge - leftEdge) / numCols;
+  const startX = leftEdge + colW / 2;
+
+  // Stagger spawn so last node appears within ~600 ms regardless of count
+  const delayStep = Math.max(4, Math.min(18, Math.floor(600 / (n || 1))));
 
   effects.forEach((eff, i) => {
-    const col = n > 20 ? Math.floor(i/effectsPerCol) : 0;
-    const row = n > 20 ? i % effectsPerCol : i;
-    const tx = baseX + col * colW;
-    const ty = effectsPerCol === 1 ? VH/2 : startY + (row/(effectsPerCol-1||1))*spread;
-    const sc = STATUS_COLORS[eff.status] || STATUS_COLORS.unknown;
-    const r = 28;
+    const col = Math.floor(i / effectsPerCol);
+    const row = i % effectsPerCol;
+    const tx  = startX + col * colW;
+    const ty  = effectsPerCol === 1 ? VH / 2
+      : startY + (row / (effectsPerCol - 1 || 1)) * spread;
+    const sc  = STATUS_COLORS[eff.status] || STATUS_COLORS.unknown;
+
+    let lines = wrap(eff.name, wrapCh);
+    let r;
+    if (n <= 10) {
+      // Small count: expand circle to fit all text
+      const rFromText = Math.ceil(lines.length * lh / 2) + 5;
+      r = Math.max(baseR, rFromText);
+    } else {
+      // Larger count: fixed radius, truncate overflow with ellipsis
+      r = baseR;
+      if (lines.length > maxLines) {
+        lines = lines.slice(0, maxLines);
+        lines[maxLines - 1] = lines[maxLines - 1].replace(/.\s*$/, '…');
+      }
+    }
+
     const node = makeNode({
       id:'eff_'+i, x:tx, y:ty, r,
-      color:discColor, lines:wrap(eff.name,13), fs:10,
+      color:discColor, lines, fs:nodeFs,
       statusColor:sc,
       onClick:()=>openEffect(eff.id),
     });
-    spawnNode(node, dAnchorX, dAnchorY, tx, ty, r, 60+i*18);
+    spawnNode(node, dAnchorX, dAnchorY, tx, ty, r, 60 + i * delayStep);
     liveNodes.set('eff_'+i, { el:node, x:tx, y:ty, r, color:discColor });
-    if (i < 40) setTimeout(()=>makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80+i*18);
+    if (i < 60) setTimeout(()=>makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
   });
 
-  if (effects.length === 0) {
-    hint.textContent = 'No effects found for this discipline';
-  }
+  if (n === 0) hint.textContent = 'No effects found for this discipline';
 }
 
 // ── EFFECT DETAIL / TIMELINE ───────────────────────────────────────────────

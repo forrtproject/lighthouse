@@ -137,7 +137,7 @@ body {
 
 /* ─── SVG NODE STYLES ─── */
 .lh-node { cursor: pointer; }
-.lh-node .nbg { transition: r .5s cubic-bezier(.4,.1,.2,1), fill-opacity .2s, stroke-width .15s; }
+.lh-node .nbg { transition: fill-opacity .2s, stroke-width .15s; }
 .lh-node:hover .nbg { stroke-width: 2.5 !important; }
 .lh-node .nlabel { pointer-events: none; font-family: inherit; }
 .lh-edge { pointer-events: none; transition: stroke-opacity .4s; }
