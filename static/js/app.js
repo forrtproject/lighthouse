@@ -469,9 +469,8 @@ async function openEffect(effectId) {
   const spine = document.createElement('div'); spine.className='tl-spine'; tlBody.appendChild(spine);
 
   const papers = (data.papers||[]).slice().sort((a,b)=>{
-    // sort: foundational first, then by type
-    const order = {foundational:0,meta_analysis:1,critique:2,replication:3,reproduction:4,other:5};
-    return (order[a.classification]||5) - (order[b.classification]||5);
+    const ay = a.year ?? -Infinity, by = b.year ?? -Infinity;
+    return ay - by;
   });
 
   if (papers.length === 0) {
@@ -492,7 +491,7 @@ async function openEffect(effectId) {
       : '';
 
     row.innerHTML = `
-      <div class="tl-year" style="color:${tc.c};opacity:.8">—</div>
+      <div class="tl-year" style="color:${tc.c};opacity:.8">${p.year ?? '—'}</div>
       <div class="tl-dot-wrap">
         <div class="tl-dot" style="border-color:${tc.c};color:${tc.c}">${tc.shape}</div>
       </div>
