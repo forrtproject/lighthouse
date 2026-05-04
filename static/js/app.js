@@ -287,10 +287,12 @@ async function renderFields() {
   const rx = Math.min(VW, VH) * 0.31;
   const ry = Math.min(VW, VH) * 0.26;
 
-  // Hub
+
+
+
   const hub = makeNode({
-    id:'__hub__', x:cx, y:cy, r:18,
-    color:'#888780', lines:['•'], fs:20, kind:'hub',
+    id:'__hub__', x:cx, y:cy, r:25,
+    color:'22ABA6', lines:['All', 'Disciplines'], fs:20, kind:'hub',
     onClick:() => jumpTo(0),
   });
   hub.setAttribute('transform', `translate(${cx},${cy})`);
