@@ -65,6 +65,7 @@ def run(xlsx_path):
             'effect_name': en, 'effect_id': make_id(en),
             'title': str(row.get('title','')).strip() if pd.notna(row.get('title')) else '',
             'doi':   str(row.get('doi','')).strip()   if pd.notna(row.get('doi'))   else '',
+            'year':  int(row['year']) if pd.notna(row.get('year')) else None,
             'apa':   str(row.get('apa_reference','')).strip() if pd.notna(row.get('apa_reference')) else '',
             'classification': norm_class(row.get('current_classification')),
             'summary': str(row.get('summary','')).strip() if pd.notna(row.get('summary')) else '',
