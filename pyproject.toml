@@ -13,4 +13,3 @@ dependencies = [
 lighthouse = "app:app"
 
 [tool.uv]
-dev-dependencies = []
