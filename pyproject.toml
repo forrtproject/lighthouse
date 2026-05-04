@@ -5,11 +5,13 @@ description = "FORRT Lighthouse — interactive network explorer for replication
 requires-python = ">=3.10"
 dependencies = [
     "flask>=3.0",
+    "gunicorn>=22.0",
     "openpyxl>=3.1",
     "pandas>=2.0",
 ]
 
 [project.scripts]
-lighthouse = "app:app"
+lighthouse = "app:create_app"
+import-data = "import_xlsx:main"
 
 [tool.uv]

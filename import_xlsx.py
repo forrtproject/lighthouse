@@ -1,9 +1,20 @@
 """
 Re-import data from FORRT_Lighthouse_Data.xlsx → data/data.json
-Usage: uv run python import_xlsx.py [path_to_xlsx]
+
+Usage:
+    uv run python import_xlsx.py [path_to_xlsx]
+    # or via the project script entry-point:
+    uv run import-data [path_to_xlsx]
 """
-import sys, re, json, pandas as pd
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
 from pathlib import Path
+
+import pandas as pd
 
 FIELD_MAP = {
     'Social Psychology':'Psychology','Cognitive Psychology':'Psychology',
@@ -76,6 +87,17 @@ def run(xlsx_path):
         json.dump({'effects': effects, 'papers': papers}, f, indent=2, ensure_ascii=False)
     print(f"Wrote {len(effects)} effects and {len(papers)} papers to {out}")
 
-if __name__ == '__main__':
-    path = sys.argv[1] if len(sys.argv) > 1 else 'FORRT_Lighthouse_Data.xlsx'
-    run(path)
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Import FORRT Lighthouse data from xlsx")
+    parser.add_argument(
+        "xlsx",
+        nargs="?",
+        default="FORRT_Lighthouse_Data.xlsx",
+        help="Path to the Excel workbook (default: FORRT_Lighthouse_Data.xlsx)",
+    )
+    args = parser.parse_args(argv)
+    run(args.xlsx)
+
+
+if __name__ == "__main__":
+    main()
