@@ -485,6 +485,9 @@ async function openEffect(effectId) {
     row.className = 'tl-row';
     row.style.animationDelay = (i*45)+'ms';
 
+    const retraction_badge = `<div id="tl-status-badge"><span class="status-badge" style="background:${bg};color:${sc}">Retracted</span></div>`;
+
+
     const doiHtml = p.doi && p.doi !== 'nan'
       ? `<a class="tl-doi" href="https://doi.org/${p.doi}" target="_blank" rel="noopener">doi:${p.doi}</a>`
       : '';
@@ -500,12 +503,44 @@ async function openEffect(effectId) {
       <div class="tl-content">
         <div class="tl-type" style="color:${tc.c}">${tc.label}</div>
         <div class="tl-paper-title">${p.title||'Untitled'}</div>
+        ${p.retracted ? retraction_badge : ''}
         ${apaHtml}
         <div class="tl-summary">${p.summary||''}</div>
         ${doiHtml}
       </div>`;
     tlBody.appendChild(row);
   });
+
+  const fr = data.foundational_retraction;
+
+  if (fr?.retracted) {
+    const originalDoiHtml = fr.original_doi
+      ? `<a class="tl-doi" href="https://doi.org/${fr.original_doi}" target="_blank" rel="noopener">Original DOI: ${fr.original_doi}</a>`
+      : '';
+
+    const retractionDoiHtml = fr.retraction_doi
+      ? `<a class="tl-doi" href="https://doi.org/${fr.retraction_doi}" target="_blank" rel="noopener">Retraction DOI: ${fr.retraction_doi}</a>`
+      : '';
+
+    const pubmedHtml = fr.retraction_pubmed_id
+      ? `<a class="tl-doi" href="https://pubmed.ncbi.nlm.nih.gov/${fr.retraction_pubmed_id}/" target="_blank" rel="noopener">Retraction PubMed: ${fr.retraction_pubmed_id}</a>`
+      : '';
+
+    const retractionDateHtml = fr.retraction_date
+      ? `<div class="tl-retraction-meta">Retraction date: ${fr.retraction_date}</div>`
+      : '';
+
+    const footer = document.createElement('div');
+    footer.className = 'tl-retraction-footer';
+    footer.innerHTML = `
+      <div class="tl-retraction-title">Foundational Paper Retracted</div>
+      ${retractionDateHtml}
+      ${originalDoiHtml}
+      ${retractionDoiHtml}
+      ${pubmedHtml}
+    `;
+    tlBody.appendChild(footer);
+  }
 
   tlPanel.classList.add('open');
 }

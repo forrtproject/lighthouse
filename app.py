@@ -166,7 +166,19 @@ def get_effect(effect_id: str):
     effect = _store().effect_by_id(effect_id)
     if effect is None:
         return jsonify({"error": "Not found"}), 404
-    return jsonify({**effect, "papers": _store().papers_for_effect(effect_id)})
+
+    papers = _store().papers_for_effect(effect_id)
+    foundational = [p for p in papers if p.get("classification") == "foundational"]
+    retracted_foundational = next((p for p in foundational if p.get("retracted")), None)
+
+    foundational_retraction = {
+        "retracted": bool(retracted_foundational),
+        "retraction_doi": retracted_foundational.get("retraction_doi") if retracted_foundational else None,
+        "retraction_date": retracted_foundational.get("retraction_date") if retracted_foundational else None,
+        "retraction_pubmed_id": retracted_foundational.get("retraction_pubmed_id") if retracted_foundational else None,
+    }
+
+    return jsonify({**effect, "papers": papers, "foundational_retraction": foundational_retraction})
 
 
 @api_bp.get("/search")

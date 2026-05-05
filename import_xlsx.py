@@ -11,8 +11,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from pathlib import Path
+from urllib.request import urlopen
+from datetime import datetime
 
 import pandas as pd
 
@@ -29,6 +30,11 @@ FIELD_MAP = {
     'Behavioural Genetics':'Neuroscience','Political Psychology':'Political Science',
     'Experimental Philosophy':'Philosophy',
 }
+
+RETRACTIONS_CSV_URL = (
+    "https://gitlab.com/crossref/retraction-watch-data/-/raw/main/"
+    "retraction_watch.csv?ref_type=heads&inline=false"
+)
 
 def make_id(name):
     return re.sub(r'[^a-z0-9_]', '_', str(name).lower().strip())[:60].strip('_')
@@ -49,7 +55,81 @@ def norm_class(c):
                'replication':'replication','reproduction':'reproduction'}
     return mapping.get(str(c).strip().lower(), str(c).strip().lower())
 
-def run(xlsx_path):
+def format_retraction_date(value: object) -> str | None:
+    raw = clean_optional(value)
+    if raw is None:
+        return None
+
+    # Handle common Retraction Watch / CSV date formats
+    for fmt in ("%m/%d/%Y %H:%M", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            return f"{dt.day} {dt.strftime('%B %Y')}"
+        except ValueError:
+            pass
+
+    # Fallback: let pandas try parsing it
+    dt = pd.to_datetime(raw, errors="coerce")
+    if pd.isna(dt):
+        return raw
+
+    return f"{dt.day} {dt.strftime('%B %Y')}"
+
+def download_retractions_csv(url: str, dest_path: Path) -> Path:
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    with urlopen(url, timeout=30) as resp:
+        data = resp.read()
+    dest_path.write_bytes(data)
+    return dest_path
+
+def normalize_doi(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    doi = str(value).strip().lower()
+    doi = re.sub(r"^https?://(dx\.)?doi\.org/", "", doi)
+    return doi
+
+def clean_optional(value: object) -> str | None:
+    if pd.isna(value):
+        return None
+    s = str(value).strip()
+    if not s or s.lower() in {"unavailable", "nan", "none", "0"}:
+        return None
+    return s
+
+def load_retractions_index(csv_path: Path) -> dict[str, dict]:
+    df = pd.read_csv(csv_path, dtype=str, keep_default_na=True)
+
+    expected = {
+        "OriginalPaperDOI",
+        "RetractionDOI",
+        "RetractionDate",
+        "RetractionPubMedID",
+    }
+    missing = expected - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns in retractions CSV: {sorted(missing)}")
+
+    idx: dict[str, dict] = {}
+    for _, row in df.iterrows():
+        original_doi = normalize_doi(row.get("OriginalPaperDOI"))
+        if not original_doi:
+            continue
+
+        # Keep first record per DOI (or adjust policy if you prefer latest date)
+        if original_doi not in idx:
+            idx[original_doi] = {
+                "retracted": True,
+                "retraction_doi": clean_optional(row.get("RetractionDOI")),
+                "retraction_date": format_retraction_date(row.get("RetractionDate")),
+                "retraction_pubmed_id": clean_optional(row.get("RetractionPubMedID")),
+            }
+
+    return idx
+
+def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
+    csv_path = download_retractions_csv(RETRACTIONS_CSV_URL, Path(retractions_csv_path))
+    retractions_index = load_retractions_index(csv_path)
     xl = pd.ExcelFile(xlsx_path)
     effects_df = pd.read_excel(xl, 'effects_review')
     papers_df  = pd.read_excel(xl, 'papers_review')
@@ -68,18 +148,35 @@ def run(xlsx_path):
             'description': desc,
             'status': norm_status(row.get('current_status_normalised') or row.get('current_status')),
         })
+    print(f"Parsed {len(effects)} effects from {xlsx_path}")
 
     papers = []
     for _, row in papers_df.iterrows():
         en = str(row['effect_name']).strip() if pd.notna(row.get('effect_name')) else ''
+        doi = str(row.get('doi','')).strip() if pd.notna(row.get('doi')) else ''
+        doi_norm = normalize_doi(doi)
+        retraction_meta = retractions_index.get(
+            doi_norm,
+            {
+                "retracted": False,
+                "retraction_doi": None,
+                "retraction_date": None,
+                "retraction_pubmed_id": None,
+            },
+        )
+
         papers.append({
             'effect_name': en, 'effect_id': make_id(en),
             'title': str(row.get('title','')).strip() if pd.notna(row.get('title')) else '',
-            'doi':   str(row.get('doi','')).strip()   if pd.notna(row.get('doi'))   else '',
+            'doi':   doi,
             'year':  int(row['year']) if pd.notna(row.get('year')) else None,
             'apa':   str(row.get('apa_reference','')).strip() if pd.notna(row.get('apa_reference')) else '',
             'classification': norm_class(row.get('current_classification')),
             'summary': str(row.get('summary','')).strip() if pd.notna(row.get('summary')) else '',
+            "retracted": retraction_meta["retracted"],
+            "retraction_doi": retraction_meta["retraction_doi"],
+            "retraction_date": retraction_meta["retraction_date"],
+            "retraction_pubmed_id": retraction_meta["retraction_pubmed_id"],
         })
 
     out = Path(__file__).parent / 'data' / 'data.json'
@@ -96,8 +193,13 @@ def main(argv: list[str] | None = None) -> None:
         default="FORRT_Lighthouse_Data.xlsx",
         help="Path to the Excel workbook (default: FORRT_Lighthouse_Data.xlsx)",
     )
+    parser.add_argument(
+        "--retractions-csv",
+        default="data/retraction_watch.csv",
+        help="Local cache path for downloaded Retraction Watch CSV",
+    )
     args = parser.parse_args(argv)
-    run(args.xlsx)
+    run(args.xlsx, args.retractions_csv)
 
 
 if __name__ == "__main__":
