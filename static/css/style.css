@@ -122,6 +122,9 @@ body {
 .leg-dot.leg-circle {
   border-radius: 50%; background: transparent; border: 1.5px solid;
 }
+.leg-dot.leg-diamond {
+  border-radius: 1px; transform: rotate(45deg);
+}
 
 /* ─── STAGE ─── */
 #stage {
