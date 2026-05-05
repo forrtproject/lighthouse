@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: forrt-lighthouse
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: sh start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14"
+      - key: FLASK_DEBUG
+        value: "0"
