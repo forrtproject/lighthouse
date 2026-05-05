@@ -485,7 +485,7 @@ async function openEffect(effectId) {
     row.className = 'tl-row';
     row.style.animationDelay = (i*45)+'ms';
 
-    const retraction_badge = `<div id="tl-status-badge"><span class="status-badge" style="background:${bg};color:${sc}">Retracted</span></div>`;
+    const retraction_badge = `<div id="tl-status-badge"><span class="status-badge" style="background:${STATUS_BG.reversed};color:${STATUS_COLORS.reversed}">Retracted</span></div>`;
 
 
     const doiHtml = p.doi && p.doi !== 'nan'
