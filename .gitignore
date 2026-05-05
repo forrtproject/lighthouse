@@ -5,7 +5,7 @@ __pycache__/
 .venv/
 
 # Generated data
-data/data.json
+data/
 
 # Dev / OS
 .DS_Store
