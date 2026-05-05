@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+
+# Generated data
+data/data.json
+
+# Dev / OS
+.DS_Store
+*.pid
