@@ -463,9 +463,9 @@ async function openEffect(effectId) {
   const data = await api(`/api/effect/${effectId}`);
   tlTitle.textContent = data.name;
   tlDesc.textContent = data.description || '';
-  const sc = STATUS_COLORS[data.status] || STATUS_COLORS.unknown;
-  const bg = STATUS_BG[data.status] || STATUS_BG.unknown;
-  tlStatus.innerHTML = `<span class="status-badge" style="background:${bg};color:${sc}">${STATUS_LABELS[data.status]||data.status}</span>`;
+  // const sc = STATUS_COLORS[data.status] || STATUS_COLORS.unknown;
+  // const bg = STATUS_BG[data.status] || STATUS_BG.unknown;
+  // tlStatus.innerHTML = `<span class="status-badge" style="background:${bg};color:${sc}">${STATUS_LABELS[data.status]||data.status}</span>`;
 
   tlBody.innerHTML = '';
   const spine = document.createElement('div'); spine.className='tl-spine'; tlBody.appendChild(spine);
