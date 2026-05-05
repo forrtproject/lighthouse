@@ -470,44 +470,69 @@ async function openEffect(effectId) {
   tlBody.innerHTML = '';
   const spine = document.createElement('div'); spine.className='tl-spine'; tlBody.appendChild(spine);
 
-  const papers = (data.papers||[]).slice().sort((a,b)=>{
+  const papers_and_wikis = (data.papers_and_wikis||[]).slice().sort((a,b)=>{
     const ay = a.year ?? -Infinity, by = b.year ?? -Infinity;
     return ay - by;
   });
 
-  if (papers.length === 0) {
+  if (papers_and_wikis.length === 0) {
     tlBody.innerHTML += '<div style="padding:18px 4px;font-size:12px;color:var(--text3);text-align:center;font-style:italic">No papers on record for this effect.</div>';
   }
 
-  papers.forEach((p, i) => {
+  papers_and_wikis.forEach((p, i) => {
     const tc = TYPE_CONF[p.classification] || TYPE_CONF.other;
     const row = document.createElement('div');
     row.className = 'tl-row';
     row.style.animationDelay = (i*45)+'ms';
+    if (p.type === 'paper'){
+  
+      const retraction_badge = `<div id="tl-status-badge"><span class="status-badge" style="background:${STATUS_BG.reversed};color:${STATUS_COLORS.reversed}">Retracted</span></div>`;
+  
+  
+      const doiHtml = p.doi && p.doi !== 'nan'
+        ? `<a class="tl-doi" href="https://doi.org/${p.doi}" target="_blank" rel="noopener">doi:${p.doi}</a>`
+        : '';
+      const apaHtml = p.apa && p.apa !== 'nan' && p.apa !== p.doi
+        ? `<div class="tl-journal" style="margin-top:3px;font-style:normal;font-size:10px;opacity:.7">${p.apa.substring(0,120)}${p.apa.length>120?'…':''}</div>`
+        : '';
+  
+      row.innerHTML = `
+        <div class="tl-year" style="color:${tc.c};opacity:.8">${p.year ?? '—'}</div>
+        <div class="tl-dot-wrap">
+          <div class="tl-dot" style="border-color:${tc.c};color:${tc.c}">${tc.shape}</div>
+        </div>
+        <div class="tl-content">
+          <div class="tl-type" style="color:${tc.c}">${tc.label}</div>
+          <div class="tl-paper-title">${p.title||'Untitled'}</div>
+          ${p.retracted ? retraction_badge : ''}
+          ${apaHtml}
+          <div class="tl-summary">${p.summary||''}</div>
+          ${doiHtml}
+        </div>`;
+    } else {
+      const validation = (p.validation || '').toLowerCase();
+      const isMoreGeneral = validation.includes('more general');
+      const hasUrl = !!p.url && p.url !== 'nan';
 
-    const retraction_badge = `<div id="tl-status-badge"><span class="status-badge" style="background:${STATUS_BG.reversed};color:${STATUS_COLORS.reversed}">Retracted</span></div>`;
+      const wikiLinkLabel = isMoreGeneral
+        ? `Featured in: ${p.title || 'Wikipedia'}`
+        : (p.title || 'Wikipedia article');
 
+      const wikiLinkHtml = hasUrl
+        ? `<a class="tl-doi" href="${p.url}" target="_blank" rel="noopener">${wikiLinkLabel}</a>`
+        : `<div class="tl-journal">${wikiLinkLabel}</div>`;
 
-    const doiHtml = p.doi && p.doi !== 'nan'
-      ? `<a class="tl-doi" href="https://doi.org/${p.doi}" target="_blank" rel="noopener">doi:${p.doi}</a>`
-      : '';
-    const apaHtml = p.apa && p.apa !== 'nan' && p.apa !== p.doi
-      ? `<div class="tl-journal" style="margin-top:3px;font-style:normal;font-size:10px;opacity:.7">${p.apa.substring(0,120)}${p.apa.length>120?'…':''}</div>`
-      : '';
-
-    row.innerHTML = `
-      <div class="tl-year" style="color:${tc.c};opacity:.8">${p.year ?? '—'}</div>
-      <div class="tl-dot-wrap">
-        <div class="tl-dot" style="border-color:${tc.c};color:${tc.c}">${tc.shape}</div>
-      </div>
-      <div class="tl-content">
-        <div class="tl-type" style="color:${tc.c}">${tc.label}</div>
-        <div class="tl-paper-title">${p.title||'Untitled'}</div>
-        ${p.retracted ? retraction_badge : ''}
-        ${apaHtml}
-        <div class="tl-summary">${p.summary||''}</div>
-        ${doiHtml}
-      </div>`;
+      row.innerHTML = `
+        <div class="tl-year" style="color:#7a5c00;opacity:.8">${p.year ?? p.wiki_year ?? '—'}</div>
+        <div class="tl-dot-wrap">
+          <div class="tl-dot" style="border-color:#7a5c00;color:#7a5c00">W</div>
+        </div>
+        <div class="tl-content">
+          <div class="tl-type" style="color:#7a5c00">Wikipedia</div>
+          <div class="tl-paper-title">${p.title || 'Untitled wiki entry'}</div>
+          ${wikiLinkHtml}
+        </div>`;
+    }
     tlBody.appendChild(row);
   });
 

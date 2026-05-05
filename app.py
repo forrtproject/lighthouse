@@ -40,6 +40,7 @@ class DataStore:
         self._by_disc: dict[str, list[dict]] = defaultdict(list)
         self._by_sub: dict[str, list[dict]] = defaultdict(list)
         self._papers_by_effect: dict[str, list[dict]] = defaultdict(list)
+        self._wikis_by_effect: dict[str, list[dict]] = defaultdict(list)
 
         for e in self.effects:
             self._by_disc[e["discipline"]].append(e)
@@ -47,6 +48,9 @@ class DataStore:
 
         for p in self.papers:
             self._papers_by_effect[p["effect_id"]].append(p)
+
+        for w in raw.get("wikis", []):
+            self._wikis_by_effect[w["effect_id"]].append(w)
 
         self.fields: dict[str, list[str]] = self._build_fields()
         self.disciplines: list[dict] = self._build_disciplines()
@@ -96,6 +100,9 @@ class DataStore:
 
     def papers_for_effect(self, effect_id: str) -> list[dict]:
         return self._papers_by_effect.get(effect_id, [])
+    
+    def wikis_for_effect(self, effect_id: str) -> list[dict]:
+        return self._wikis_by_effect.get(effect_id, [])
 
     def search(self, query: str, limit: int = 20) -> list[dict]:
         q = query.lower()
@@ -168,6 +175,7 @@ def get_effect(effect_id: str):
         return jsonify({"error": "Not found"}), 404
 
     papers = _store().papers_for_effect(effect_id)
+    wikis  = _store().wikis_for_effect(effect_id) 
     foundational = [p for p in papers if p.get("classification") == "foundational"]
     retracted_foundational = next((p for p in foundational if p.get("retracted")), None)
 
@@ -178,7 +186,27 @@ def get_effect(effect_id: str):
         "retraction_pubmed_id": retracted_foundational.get("retraction_pubmed_id") if retracted_foundational else None,
     }
 
-    return jsonify({**effect, "papers": papers, "foundational_retraction": foundational_retraction})
+    papers = _store().papers_for_effect(effect_id)
+    wikis  = _store().wikis_for_effect(effect_id) 
+    foundational = [p for p in papers if p.get("classification") == "foundational"]
+    retracted_foundational = next((p for p in foundational if p.get("retracted")), None)
+
+    # Combine papers and wikis, sort by year (or wiki_year for wikis)
+    combined = []
+    for p in papers:
+        p_copy = p.copy()
+        p_copy["_type"] = "paper"
+        combined.append(p_copy)
+    
+    for w in wikis:
+        w_copy = w.copy()
+        w_copy["_type"] = "wiki"
+        combined.append(w_copy)
+    
+    # Sort by year descending (newest first)
+    combined.sort(key=lambda x: x.get("year") or 0, reverse=False)
+
+    return jsonify({**effect, "papers_and_wikis": combined, "foundational_retraction": foundational_retraction, "wikis": wikis})
 
 
 @api_bp.get("/search")

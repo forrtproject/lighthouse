@@ -133,6 +133,7 @@ def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
     xl = pd.ExcelFile(xlsx_path)
     effects_df = pd.read_excel(xl, 'effects_review')
     papers_df  = pd.read_excel(xl, 'papers_review')
+    effects_wikipaedia_df = pd.read_excel(xl, 'effects_wikipedia')
 
     effects = []
     for _, row in effects_df.iterrows():
@@ -177,13 +178,30 @@ def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
             "retraction_doi": retraction_meta["retraction_doi"],
             "retraction_date": retraction_meta["retraction_date"],
             "retraction_pubmed_id": retraction_meta["retraction_pubmed_id"],
+            "type": "paper",
         })
+    print(f"Parsed {len(papers)} papers from {xlsx_path} with retraction metadata from {csv_path}")
+
+    wikis = []
+    for _, row in effects_wikipaedia_df.iterrows():
+        name = str(row['effect_name']).strip()
+        wikis.append({
+            'effect_id': make_id(name),
+            'name': name,
+            'title': str(row.get('wiki_title','')).strip() if pd.notna(row.get('wiki_title')) else '',
+            'snippet': str(row.get('wiki_snippet','')).strip() if pd.notna(row.get('wiki_snippet')) else '',
+            'year': int(row['year']) if pd.notna(row.get('year')) else None,
+            'validation': str(row.get('validation','')).strip() if pd.notna(row.get('validation')) else '',
+            'url': str(row.get('wiki_url','')).strip() if pd.notna(row.get('wiki_url')) else '',
+            "type": "wiki",
+        })
+    print(f"Parsed {len(wikis)} Wikipedia entries from {xlsx_path}")
 
     out = Path(__file__).parent / 'data' / 'data.json'
     out.parent.mkdir(exist_ok=True)
     with open(out, 'w', encoding='utf-8') as f:
-        json.dump({'effects': effects, 'papers': papers}, f, indent=2, ensure_ascii=False)
-    print(f"Wrote {len(effects)} effects and {len(papers)} papers to {out}")
+        json.dump({'effects': effects, 'papers': papers, 'wikis': wikis}, f, indent=2, ensure_ascii=False)
+    print(f"Wrote {len(effects)} effects, {len(papers)} papers, and {len(wikis)} Wikipedia entries to {out}")
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Import FORRT Lighthouse data from xlsx")
