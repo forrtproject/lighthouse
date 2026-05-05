@@ -106,7 +106,7 @@ function makeSvgEl(tag, attrs) {
   return el;
 }
 
-function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', statusColor=null, onClick }) {
+function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick }) {
   const g = document.createElementNS(NS, 'g');
   g.setAttribute('class', 'lh-node' + (kind==='anchor'?' lh-anchor':''));
   g.setAttribute('transform', `translate(${x},${y})`);
@@ -129,16 +129,16 @@ function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', statusColor
   });
   g.appendChild(rect);
 
-  // Status ring (outer rounded rect)
-  if (statusColor && kind !== 'anchor') {
-    const pad = 5;
-    const ring = makeSvgEl('rect', {
-      x:-(rw/2+pad), y:-(rh/2+pad), width:rw+pad*2, height:rh+pad*2, rx:cornerR+pad,
-      fill: 'none', stroke: statusColor, 'stroke-width': '2',
-      'stroke-opacity': '0.5', 'stroke-dasharray': '4 3',
-    });
-    g.insertBefore(ring, rect);
-  }
+  // // Status ring (outer rounded rect)
+  // if (statusColor && kind !== 'anchor') {
+  //   const pad = 5;
+  //   const ring = makeSvgEl('rect', {
+  //     x:-(rw/2+pad), y:-(rh/2+pad), width:rw+pad*2, height:rh+pad*2, rx:cornerR+pad,
+  //     fill: 'none', stroke: statusColor, 'stroke-width': '2',
+  //     'stroke-opacity': '0.5', 'stroke-dasharray': '4 3',
+  //   });
+  //   g.insertBefore(ring, rect);
+  // }
 
   const lh = (fs + 3.5);
   const startY = -((lines.length - 1) * lh) / 2;
@@ -413,7 +413,7 @@ function drawEffectsLayout(effects, anchorLabel) {
     const tx  = startX + col * colW;
     const ty  = effectsPerCol === 1 ? VH / 2
       : startY + (row / (effectsPerCol - 1 || 1)) * spread;
-    const sc  = STATUS_COLORS[eff.status] || STATUS_COLORS.unknown;
+    // const sc  = STATUS_COLORS[eff.status] || STATUS_COLORS.unknown;
 
     let lines = wrap(eff.name, wrapCh);
     let r;
@@ -433,7 +433,7 @@ function drawEffectsLayout(effects, anchorLabel) {
     const node = makeNode({
       id:'eff_'+i, x:tx, y:ty, r,
       color:discColor, lines, fs:nodeFs,
-      statusColor:sc,
+      // statusColor:sc,
       onClick:()=>openEffect(eff.id),
     });
     spawnNode(node, dAnchorX, dAnchorY, tx, ty, r, 60 + i * delayStep);
