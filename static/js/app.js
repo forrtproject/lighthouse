@@ -3,9 +3,10 @@ const NS = 'http://www.w3.org/2000/svg';
 
 // ── THEME ──────────────────────────────────────────────────────────────────
 const root = document.documentElement;
-let darkMode = window.matchMedia('(prefers-color-scheme:dark)').matches;
+let darkMode = localStorage.getItem('theme') === 'dark' || (localStorage.getItem('theme') === null && window.matchMedia('(prefers-color-scheme:dark)').matches);
 function applyTheme() {
   root.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   document.getElementById('icon-sun').style.display = darkMode ? 'none' : 'block';
   document.getElementById('icon-moon').style.display = darkMode ? 'block' : 'none';
 }
@@ -566,6 +567,11 @@ async function openEffect(effectId) {
     `;
     tlBody.appendChild(footer);
   }
+
+  const suggest = document.createElement('div');
+  suggest.className = 'tl-suggest';
+  suggest.innerHTML = `<a href="/about#suggest-a-new-item">Suggest a new item</a>`;
+  tlBody.appendChild(suggest);
 
   tlPanel.classList.add('open');
 }
