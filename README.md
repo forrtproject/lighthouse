@@ -113,3 +113,7 @@ To run in production manually:
 ```bash
 uv run gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 4
 ```
+
+## Previous work
+
+A previous iteration of this project is available [on this repository](https://github.com/forrtproject/lighthouse-v1).
