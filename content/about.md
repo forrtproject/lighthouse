@@ -5,6 +5,7 @@ FORRT Lighthouse is a place for researchers, teachers, and practitioners to lear
 ## Data & Validation
 
 This project is the spiritual successor to [FORRT's Replications and Reversals list][2], which is where it inherited most of the current data such as effect size descriptions from. This is an overview of data sources and their status:
+
 - FORRT Replications and Reversals: https://forrt.org/reversals
 - FORRT Library of Reproduction and Replication Attempts: https://forrt.org/replication-hub/flora
 - Retractionwatch Database (via Crossref): https://retractiondatabase.org/RetractionSearch.aspx?
