@@ -49,6 +49,17 @@ body {
   height: 52px;
 }
 #logo-wrap { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.logo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.logo-link img {
+  display: block;
+  flex-shrink: 0;
+  transform: translateY(-3px);
+}
 .logo-text { font-size: 15px; color: var(--text2); letter-spacing: .01em; }
 .logo-text strong { color: var(--text); font-weight: 600; }
 
