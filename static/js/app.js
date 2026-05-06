@@ -450,7 +450,8 @@ function drawEffectsLayout(effects, anchorLabel) {
   const numCols = n > 100 ? 6 : n > 70 ? 5 : n > 40 ? 4 : n > 20 ? 3 : n > 10 ? 2 : 1;
   const baseR   = n > 100 ? 14 : n > 70 ? 15 : n > 40 ? 18 : n > 20 ? 22 : n > 10 ? 26 : 30;
   const nodeFs  = n > 70  ? 8  : n > 30  ? 9  : 10;
-  const wrapCh  = n > 70  ? 9  : n > 30  ? 11 : 13;
+  // For small n, allow wider lines so text uses width not height
+  const wrapCh  = n > 70  ? 9  : n > 30  ? 11 : n > 10 ? 13 : 22;
   const lh      = nodeFs + 3;
   // Max lines that can fit inside baseR without overflow
   const maxLines = Math.max(1, Math.floor((baseR * 2 - 6) / lh));
@@ -476,18 +477,11 @@ function drawEffectsLayout(effects, anchorLabel) {
     // const sc  = STATUS_COLORS[eff.status] || STATUS_COLORS.unknown;
 
     let lines = wrap(eff.name, wrapCh);
-    let r;
-    if (n <= 10) {
-      // Small count: expand circle to fit all text
-      const rFromText = Math.ceil(lines.length * lh / 2) + 5;
-      r = Math.max(baseR, rFromText);
-    } else {
-      // Larger count: fixed radius, truncate overflow with ellipsis
-      r = baseR;
-      if (lines.length > maxLines) {
-        lines = lines.slice(0, maxLines);
-        lines[maxLines - 1] = lines[maxLines - 1].replace(/.\s*$/, '…');
-      }
+    // Always fixed radius — truncate overflow with ellipsis to prevent height growth
+    const r = baseR;
+    if (lines.length > maxLines) {
+      lines = lines.slice(0, maxLines);
+      lines[maxLines - 1] = lines[maxLines - 1].replace(/.\s*$/, '…');
     }
 
     const node = makeNode({
