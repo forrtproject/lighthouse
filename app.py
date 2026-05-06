@@ -14,6 +14,7 @@ import logging
 import os
 from collections import defaultdict
 from pathlib import Path
+import markdown
 
 from flask import Blueprint, Flask, jsonify, render_template, request
 
@@ -273,7 +274,6 @@ def create_app(data_path: Path = DATA_PATH) -> Flask:
 
     @flask_app.get("/about")
     def about():
-        import markdown
         md_path = Path(__file__).parent / "content" / "about.md"
         html = markdown.markdown(md_path.read_text(encoding="utf-8"), extensions=["extra", "toc"])
         return render_template("about.html", content=html)
