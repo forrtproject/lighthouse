@@ -39,12 +39,17 @@ class DataStore:
         self._by_id: dict[str, dict] = {e["id"]: e for e in self.effects}
         self._by_disc: dict[str, list[dict]] = defaultdict(list)
         self._by_sub: dict[str, list[dict]] = defaultdict(list)
+        self._by_cluster: dict[str, list[dict]] = defaultdict(list)
+        self._clusters_by_disc: dict[str, set[str]] = defaultdict(set)
         self._papers_by_effect: dict[str, list[dict]] = defaultdict(list)
         self._wikis_by_effect: dict[str, list[dict]] = defaultdict(list)
 
         for e in self.effects:
             self._by_disc[e["discipline"]].append(e)
             self._by_sub[e["sub_discipline"]].append(e)
+            for cluster in e.get("clusters", []):
+                self._by_cluster[cluster].append(e)
+                self._clusters_by_disc[e["discipline"]].add(cluster)
 
         for p in self.papers:
             self._papers_by_effect[p["effect_id"]].append(p)
@@ -88,12 +93,18 @@ class DataStore:
         *,
         discipline: str | None = None,
         sub_discipline: str | None = None,
+        cluster: str | None = None,
     ) -> list[dict]:
+        if cluster:
+            return self._by_cluster.get(cluster, [])
         if sub_discipline:
             return self._by_sub.get(sub_discipline, [])
         if discipline:
             return self._by_disc.get(discipline, [])
         return self.effects
+
+    def clusters_for_discipline(self, discipline: str) -> list[str]:
+        return sorted(self._clusters_by_disc.get(discipline, set()))
 
     def effect_by_id(self, effect_id: str) -> dict | None:
         return self._by_id.get(effect_id)
@@ -151,11 +162,18 @@ def get_sub_disciplines(disc: str):
     return jsonify(list(subs.values()))
 
 
+@api_bp.get("/clusters/<disc>")
+def get_clusters(disc: str):
+    clusters = _store().clusters_for_discipline(disc)
+    return jsonify([{"name": c, "discipline": disc} for c in clusters])
+
+
 @api_bp.get("/effects")
 def get_effects():
     disc = request.args.get("discipline") or None
     sub = request.args.get("sub_discipline") or None
-    effects = _store().effects_for(discipline=disc, sub_discipline=sub)
+    cluster = request.args.get("cluster") or None
+    effects = _store().effects_for(discipline=disc, sub_discipline=sub, cluster=cluster)
     return jsonify([
         {
             "id": e["id"],

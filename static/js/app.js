@@ -46,7 +46,7 @@ const TYPE_CONF = {
 };
 
 // ── STATE ──────────────────────────────────────────────────────────────────
-let state = { level: 0, field: null, disc: null, sub: null, effect: null };
+let state = { level: 0, field: null, disc: null, sub: null, cluster: null, effect: null };
 const liveNodes = new Map();  // id → { el, x, y, r, color, data }
 let VW = 0, VH = 0;
 const svg = document.getElementById('net-svg');
@@ -91,10 +91,11 @@ function setBc() {
 }
 
 function jumpTo(lvl) {
-  if (lvl <= 0) { state = { level:0, field:null, disc:null, sub:null, effect:null }; closeTimeline(); render(); }
-  else if (lvl === 1 && state.field) { state = { ...state, level:1, disc:null, sub:null, effect:null }; closeTimeline(); render(); }
-  else if (lvl === 2 && state.disc)  { state = { ...state, level:2, sub:null, effect:null }; closeTimeline(); render(); }
-  else if (lvl === 3 && state.sub)   { state = { ...state, level:3, effect:null }; closeTimeline(); render(); }
+  if (lvl <= 0) { state = { level:0, field:null, disc:null, sub:null, cluster:null, effect:null }; closeTimeline(); render(); }
+  else if (lvl === 1 && state.field) { state = { ...state, level:1, disc:null, sub:null, cluster:null, effect:null }; closeTimeline(); render(); }
+  else if (lvl === 2 && state.disc)  { state = { ...state, level:2, sub:null, cluster:null, effect:null }; closeTimeline(); render(); }
+  else if (lvl === 3 && state.cluster)   { state = { ...state, level:3, effect:null }; closeTimeline(); render(); }
+  else if (lvl === 4 && state.effect) { state = { ...state, level:4 }; closeTimeline(); render(); }
 }
 
 backBtn.addEventListener('click', () => jumpTo(state.level - 1));
@@ -271,11 +272,11 @@ async function render() {
     hint.textContent = 'Click a discipline';
     await renderDiscs();
   } else if (state.level === 2) {
-    hint.textContent = 'Click an effect to see evidence';
-    await renderEffects();
+    hint.textContent = 'Click a cluster to filter effects';
+    await renderClusters();
   } else if (state.level === 3) {
     hint.textContent = 'Click an effect to see evidence';
-    await renderEffectsInSub();
+    await renderEffectsByCluster();
   }
 }
 
@@ -354,6 +355,64 @@ async function renderDiscs() {
     liveNodes.set('disc_'+i, { el:node, x:tx, y:ty, r, color:dc });
     setTimeout(()=>makeEdge(anchorX, anchorY, tx, ty, dc, 0), 110+i*40);
   });
+}
+
+// Level 2: Clusters for selected discipline
+async function renderClusters() {
+  const clusters = await api(`/api/clusters/${encodeURIComponent(state.disc)}`);
+  const cy = VH/2;
+  const anchorX = 70, anchorY = cy;
+
+  // Discipline anchor on left
+  const color = getDiscColor(state.disc);
+  const anchor = makeNode({
+    id:'__disc__', x:anchorX, y:anchorY, r:36,
+    color, lines:wrap(state.disc,10), fs:10, kind:'anchor',
+    onClick:()=>jumpTo(1),
+  });
+  anchor.setAttribute('transform', `translate(${anchorX},${anchorY})`);
+  svg.appendChild(anchor);
+  setTimeout(()=>{ anchor.style.transition='opacity .3s'; anchor.style.opacity='1'; },30);
+  liveNodes.set('__disc__', { el:anchor, x:anchorX, y:anchorY, r:36, color });
+
+  const n = clusters.length;
+  const tlOpen = document.getElementById('timeline-panel').classList.contains('open');
+  const rightEdge = tlOpen ? VW - 400 : VW - 20;
+  const leftEdge = anchorX + 95;
+  const numCols = n > 20 ? 4 : n > 12 ? 3 : n > 6 ? 2 : 1;
+  const nodeFs = n > 20 ? 9 : 10;
+  const wrapCh = n > 20 ? 11 : 13;
+  const baseR = n > 20 ? 26 : n > 12 ? 28 : 30;
+  const perCol = Math.ceil(n / numCols);
+  const rowSpacing = baseR * 2 + 12;
+  const spread = Math.min(VH * 0.85, perCol * rowSpacing);
+  const startY = VH / 2 - spread / 2;
+  const colW = (rightEdge - leftEdge) / numCols;
+  const startX = leftEdge + colW / 2;
+
+  clusters.forEach((c, i) => {
+    const col = Math.floor(i / perCol);
+    const row = i % perCol;
+    const tx = startX + col * colW;
+    const ty = perCol === 1 ? cy : startY + (row / (perCol - 1 || 1)) * spread;
+    const cc = getDiscColor(c.name); // use cluster name for consistent coloring
+    const r = baseR;
+    const node = makeNode({
+      id:'clust_'+i, x:tx, y:ty, r,
+      color:cc, lines:wrap(c.name, wrapCh), fs:nodeFs,
+      onClick:()=>{ state.cluster=c.name; state.level=3; render(); },
+    });
+    const delayStep = Math.max(6, Math.min(18, Math.floor(650 / (n || 1))));
+    spawnNode(node, anchorX, anchorY, tx, ty, r, 80 + i * delayStep);
+    liveNodes.set('clust_'+i, { el:node, x:tx, y:ty, r, color:cc });
+    setTimeout(()=>makeEdge(anchorX, anchorY, tx, ty, cc, 0), 110 + i * delayStep);
+  });
+}
+
+// Level 3: Effects for selected cluster
+async function renderEffectsByCluster() {
+  const effects = await api(`/api/effects?cluster=${encodeURIComponent(state.cluster)}`);
+  drawEffectsLayout(effects, state.cluster);
 }
 
 // Level 2: Effects for selected discipline (flat, since sub == disc)

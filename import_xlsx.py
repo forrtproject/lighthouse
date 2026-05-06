@@ -142,12 +142,21 @@ def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
         sub  = str(row.get('sub_discipline', disc)).strip()
         desc = str(row.get('description', row.get('cleaned_description',''))).strip()
         if not desc or desc == 'nan': desc = ''
+        
+        # Extract clusters from cluster_a, cluster_b, cluster_c columns
+        clusters = []
+        for col in ['cluster_a', 'cluster_b', 'cluster_c']:
+            cluster_val = clean_optional(row.get(col))
+            if cluster_val:
+                clusters.append(cluster_val)
+        
         effects.append({
             'id': make_id(name), 'name': name,
             'discipline': disc, 'sub_discipline': sub,
             'field': FIELD_MAP.get(disc, row.get('field','Other')),
             'description': desc,
             'status': norm_status(row.get('current_status_normalised') or row.get('current_status')),
+            'clusters': clusters,
         })
     print(f"Parsed {len(effects)} effects from {xlsx_path}")
 
