@@ -728,6 +728,162 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#search-wrap')) searchResults.classList.remove('open');
 });
 
+// ── ONBOARDING TOUR ───────────────────────────────────────────────────────
+const TOUR_STORAGE_KEY = 'lighthouse.onboarding.v1';
+const TOUR_STEPS = [
+  {
+    title: 'Welcome to Lighthouse',
+    body: 'This map lets you browse effects by field, discipline, and cluster. Click Next for a quick walkthrough.',
+    selector: '#logo-wrap',
+    placement: 'bottom',
+  },
+  {
+    title: 'Home and About',
+    body: 'Use Home to reset to the main map and About to read project context and suggest updates.',
+    selector: '#home-link',
+    placement: 'bottom',
+  },
+  {
+    title: 'Search Effects and Tags',
+    body: 'Search supports both effects and tags. Tag results are clickable and open the matching cluster view.',
+    selector: '#search-wrap',
+    placement: 'bottom',
+  },
+  {
+    title: 'Explore the Map',
+    body: 'Click nodes in the center map to drill down from disciplines to clusters and effects.',
+    selector: '#stage',
+    placement: 'bottom',
+  },
+  {
+    title: 'Theme Toggle',
+    body: 'Switch between light and dark mode at any time.',
+    selector: '#theme-toggle',
+    placement: 'bottom',
+  },
+];
+
+let tourState = null;
+let tourResizeHandler = null;
+
+function clearTourTarget() {
+  if (tourState?.targetEl) {
+    tourState.targetEl.classList.remove('tour-target');
+    tourState.targetEl = null;
+  }
+}
+
+function destroyTour(markSeen) {
+  clearTourTarget();
+  if (tourResizeHandler) {
+    window.removeEventListener('resize', tourResizeHandler);
+    tourResizeHandler = null;
+  }
+  if (tourState?.backdrop) tourState.backdrop.remove();
+  if (tourState?.card) tourState.card.remove();
+  if (markSeen) localStorage.setItem(TOUR_STORAGE_KEY, '1');
+  tourState = null;
+}
+
+function placeTourCard(card, targetEl, placement) {
+  const margin = 12;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const cardRect = card.getBoundingClientRect();
+  let left = (vw - cardRect.width) / 2;
+  let top = (vh - cardRect.height) / 2;
+
+  if (targetEl) {
+    const tr = targetEl.getBoundingClientRect();
+    const placeAbove = placement === 'top';
+    top = placeAbove ? tr.top - cardRect.height - margin : tr.bottom + margin;
+    left = tr.left + (tr.width - cardRect.width) / 2;
+
+    if (top < margin) top = tr.bottom + margin;
+    if (top + cardRect.height > vh - margin) top = Math.max(margin, tr.top - cardRect.height - margin);
+  }
+
+  left = Math.max(margin, Math.min(left, vw - cardRect.width - margin));
+  top = Math.max(margin, Math.min(top, vh - cardRect.height - margin));
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+}
+
+function showTourStep(stepIndex) {
+  if (!tourState) return;
+  const total = TOUR_STEPS.length;
+  if (stepIndex < 0) return;
+  if (stepIndex >= total) {
+    destroyTour(true);
+    return;
+  }
+
+  const step = TOUR_STEPS[stepIndex];
+  tourState.stepIndex = stepIndex;
+  clearTourTarget();
+
+  const targetEl = step.selector ? document.querySelector(step.selector) : null;
+  if (targetEl) {
+    targetEl.classList.add('tour-target');
+    tourState.targetEl = targetEl;
+  }
+
+  tourState.title.textContent = step.title;
+  tourState.body.textContent = step.body;
+  tourState.meta.textContent = `Step ${stepIndex + 1} of ${total}`;
+  tourState.backBtn.style.display = stepIndex === 0 ? 'none' : 'inline-block';
+  tourState.nextBtn.textContent = stepIndex === total - 1 ? 'Finish' : 'Next';
+
+  placeTourCard(tourState.card, targetEl, step.placement || 'bottom');
+}
+
+function startTour(force = false) {
+  if (tourState) return;
+  if (!force && localStorage.getItem(TOUR_STORAGE_KEY)) return;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'tour-backdrop';
+
+  const card = document.createElement('div');
+  card.className = 'tour-card';
+  card.innerHTML = `
+    <div class="tour-title"></div>
+    <div class="tour-body"></div>
+    <div class="tour-meta"></div>
+    <div class="tour-actions">
+      <button type="button" class="tour-btn" data-tour-action="skip">Skip</button>
+      <button type="button" class="tour-btn" data-tour-action="back">Back</button>
+      <button type="button" class="tour-btn primary" data-tour-action="next">Next</button>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(card);
+
+  const title = card.querySelector('.tour-title');
+  const body = card.querySelector('.tour-body');
+  const meta = card.querySelector('.tour-meta');
+  const skipBtn = card.querySelector('[data-tour-action="skip"]');
+  const backBtn = card.querySelector('[data-tour-action="back"]');
+  const nextBtn = card.querySelector('[data-tour-action="next"]');
+
+  tourState = { backdrop, card, title, body, meta, skipBtn, backBtn, nextBtn, targetEl: null, stepIndex: 0 };
+
+  skipBtn.addEventListener('click', () => destroyTour(true));
+  backBtn.addEventListener('click', () => showTourStep(tourState.stepIndex - 1));
+  nextBtn.addEventListener('click', () => showTourStep(tourState.stepIndex + 1));
+  tourResizeHandler = () => {
+    if (!tourState) return;
+    const step = TOUR_STEPS[tourState.stepIndex] || TOUR_STEPS[0];
+    placeTourCard(tourState.card, tourState.targetEl, step.placement || 'bottom');
+  };
+  window.addEventListener('resize', tourResizeHandler);
+
+  showTourStep(0);
+}
+
+document.getElementById('tour-btn')?.addEventListener('click', () => startTour(true));
+
 // ── INIT ───────────────────────────────────────────────────────────────────
 function draw() { /* refresh color fills on theme change */
   liveNodes.forEach(n => {
@@ -742,3 +898,4 @@ function draw() { /* refresh color fills on theme change */
 }
 
 render();
+setTimeout(() => startTour(false), 700);
