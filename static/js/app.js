@@ -645,26 +645,86 @@ const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 let searchTimeout;
 
+function colorForTag(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % DISC_COLORS.length;
+  return DISC_COLORS[idx];
+}
+
+function openClusterFromSearch(clusterName, disciplineName) {
+  state.field = null;
+  state.disc = disciplineName;
+  state.sub = disciplineName;
+  state.cluster = clusterName;
+  state.level = 3;
+  closeTimeline();
+  render();
+}
+
 searchInput.addEventListener('input', () => {
   clearTimeout(searchTimeout);
   const q = searchInput.value.trim();
   if (q.length < 2) { searchResults.classList.remove('open'); return; }
   searchTimeout = setTimeout(async () => {
-    const results = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    const payload = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    const effects = payload.effects || [];
+    const clusters = payload.clusters || [];
     searchResults.innerHTML = '';
-    if (results.length === 0) {
+    if (effects.length === 0 && clusters.length === 0) {
       searchResults.innerHTML = '<div class="sr-item" style="color:var(--text3)">No results</div>';
     } else {
-      results.forEach(r => {
-        const div = document.createElement('div'); div.className = 'sr-item';
-        div.innerHTML = `<div class="sr-item-name">${r.name}</div><div class="sr-item-disc">${r.discipline}</div>`;
-        div.addEventListener('click', () => {
-          searchResults.classList.remove('open');
-          searchInput.value = '';
-          openEffect(r.id);
+      if (clusters.length > 0) {
+        const section = document.createElement('div');
+        section.className = 'sr-section';
+        section.innerHTML = '<div class="sr-section-title">Tags</div>';
+
+        const grid = document.createElement('div');
+        grid.className = 'sr-tag-grid';
+
+        clusters.forEach(tag => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sr-tag';
+          btn.innerHTML = `<span class="sr-tag-name">${tag.name}</span><span class="sr-tag-sep"> - </span><span class="sr-tag-meta">${tag.discipline}</span>`;
+
+          const tagColor = colorForTag(tag.name);
+          btn.style.borderColor = tagColor;
+          btn.style.background = darkMode ? hexAlpha(tagColor, 0.22) : hexAlpha(tagColor, 0.14);
+
+          btn.addEventListener('click', () => {
+            searchResults.classList.remove('open');
+            searchInput.value = '';
+            openClusterFromSearch(tag.name, tag.discipline);
+          });
+          grid.appendChild(btn);
         });
-        searchResults.appendChild(div);
-      });
+
+        section.appendChild(grid);
+        searchResults.appendChild(section);
+      }
+
+      if (effects.length > 0) {
+        if (clusters.length > 0) {
+          const divider = document.createElement('div');
+          divider.className = 'sr-divider';
+          searchResults.appendChild(divider);
+        }
+
+        effects.forEach(r => {
+          const div = document.createElement('div'); div.className = 'sr-item';
+          div.innerHTML = `<div class="sr-item-name">${r.name}</div><div class="sr-item-disc">${r.discipline}</div>`;
+          div.addEventListener('click', () => {
+            searchResults.classList.remove('open');
+            searchInput.value = '';
+            openEffect(r.id);
+          });
+          searchResults.appendChild(div);
+        });
+      }
     }
     searchResults.classList.add('open');
   }, 250);

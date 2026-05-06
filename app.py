@@ -115,20 +115,36 @@ class DataStore:
     def wikis_for_effect(self, effect_id: str) -> list[dict]:
         return self._wikis_by_effect.get(effect_id, [])
 
-    def search(self, query: str, limit: int = 20) -> list[dict]:
+    def search(self, query: str, limit: int = 20) -> dict[str, list[dict]]:
         q = query.lower()
-        results = []
+        effect_results = []
         for e in self.effects:
             if q in e["name"].lower() or q in e.get("description", "").lower():
-                results.append({
+                effect_results.append({
                     "id": e["id"],
                     "name": e["name"],
                     "discipline": e["discipline"],
                     "status": e["status"],
                 })
-                if len(results) >= limit:
+                if len(effect_results) >= limit:
                     break
-        return results
+
+        cluster_results: list[dict] = []
+        for disc, clusters in self._clusters_by_disc.items():
+            for cluster in sorted(clusters):
+                if q in cluster.lower():
+                    count = sum(
+                        1
+                        for e in self._by_disc.get(disc, [])
+                        if cluster in e.get("clusters", [])
+                    )
+                    cluster_results.append({
+                        "name": cluster,
+                        "discipline": disc,
+                        "effect_count": count,
+                    })
+
+        return {"effects": effect_results, "clusters": cluster_results[:limit]}
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +249,7 @@ def get_effect(effect_id: str):
 def search():
     q = request.args.get("q", "").strip()
     if len(q) < 2:
-        return jsonify([])
+        return jsonify({"effects": [], "clusters": []})
     return jsonify(_store().search(q))
 
 
