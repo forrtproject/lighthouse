@@ -1,0 +1,32 @@
+#about-main {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+#about-content h1 {
+  font-size: 22px; font-weight: 700; color: var(--text);
+  margin-bottom: 24px;
+}
+
+#about-content h2 {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  margin: 36px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+#about-content p {
+  font-size: 13px; color: var(--text2); line-height: 1.7;
+  margin-bottom: 12px;
+}
+
+#about-content a {
+  color: var(--accent); text-decoration: none;
+}
+#about-content a:hover { text-decoration: underline; }
+
+#about-content ul, #about-content ol {
+  font-size: 13px; color: var(--text2); line-height: 1.7;
+  padding-left: 20px; margin-bottom: 12px;
+}

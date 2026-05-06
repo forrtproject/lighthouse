@@ -253,6 +253,13 @@ def create_app(data_path: Path = DATA_PATH) -> Flask:
     def index():
         return render_template("index.html")
 
+    @flask_app.get("/about")
+    def about():
+        import markdown
+        md_path = Path(__file__).parent / "content" / "about.md"
+        html = markdown.markdown(md_path.read_text(encoding="utf-8"), extensions=["extra", "toc"])
+        return render_template("about.html", content=html)
+
     @flask_app.errorhandler(Exception)
     def handle_exception(exc: Exception):
         logger.exception("Unhandled exception: %s", exc)
