@@ -199,6 +199,8 @@ def get_effect(effect_id: str):
         combined.append(p_copy)
     
     for w in wikis:
+        if (w.get("validation") or "").strip().lower() == "non-related":
+            continue
         w_copy = w.copy()
         w_copy["_type"] = "wiki"
         combined.append(w_copy)
