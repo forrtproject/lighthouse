@@ -59,6 +59,10 @@ body {
   display: block;
   flex-shrink: 0;
   transform: translateY(-3px);
+  filter: invert(1);
+}
+[data-theme="dark"] .logo-link img {
+  filter: invert(0);
 }
 .logo-text { font-size: 15px; color: var(--text2); letter-spacing: .01em; }
 .logo-text strong { color: var(--text); font-weight: 600; }
