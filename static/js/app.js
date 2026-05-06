@@ -108,7 +108,7 @@ function makeSvgEl(tag, attrs) {
   return el;
 }
 
-function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick }) {
+function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick, boxWidth, boxHeight }) {
   const g = document.createElementNS(NS, 'g');
   g.setAttribute('class', 'lh-node' + (kind==='anchor'?' lh-anchor':''));
   g.setAttribute('transform', `translate(${x},${y})`);
@@ -119,8 +119,8 @@ function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick }) 
 
   // Rounded rectangle: width driven by longest label line, height by r
   const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, '');
-  const rw = Math.max(r * 2, longestLine.length * fs * 0.62 + 14);
-  const rh = r * 2;
+  const rw = boxWidth || Math.max(r * 2, longestLine.length * fs * 0.62 + 14);
+  const rh = boxHeight || r * 2;
   const cornerR = Math.round(r * 0.35);
 
   const rect = makeSvgEl('rect', {
@@ -428,6 +428,14 @@ async function renderEffectsInSub() {
 
 function drawEffectsLayout(effects, anchorLabel) {
   const discColor = getDiscColor(state.disc||state.field);
+  const effectFs = 10;
+  const effectBoxSample = 'Better-than-average effect';
+  const effectBoxW = Math.ceil(effectBoxSample.length * effectFs * 0.62 + 18);
+  const effectBoxH = 60;
+  const effectWrapCh = effectBoxSample.length;
+  const effectLineHeight = effectFs + 3;
+  const effectMaxLines = Math.max(1, Math.floor((effectBoxH - 10) / effectLineHeight));
+  const effectR = effectBoxH / 2;
 
   // Discipline anchor
   const dAnchorX = 65, dAnchorY = VH/2;
@@ -448,16 +456,9 @@ function drawEffectsLayout(effects, anchorLabel) {
 
   // Adaptive layout: scale columns, radius, font, and wrap width with effect count
   const numCols = n > 100 ? 6 : n > 70 ? 5 : n > 40 ? 4 : n > 20 ? 3 : n > 10 ? 2 : 1;
-  const baseR   = n > 100 ? 14 : n > 70 ? 15 : n > 40 ? 18 : n > 20 ? 22 : n > 10 ? 26 : 30;
-  const nodeFs  = n > 70  ? 8  : n > 30  ? 9  : 10;
-  // For small n, allow wider lines so text uses width not height
-  const wrapCh  = n > 70  ? 9  : n > 30  ? 11 : n > 10 ? 13 : 22;
-  const lh      = nodeFs + 3;
-  // Max lines that can fit inside baseR without overflow
-  const maxLines = Math.max(1, Math.floor((baseR * 2 - 6) / lh));
 
   const effectsPerCol = Math.ceil(n / numCols);
-  const rowSpacing    = baseR * 2 + 8;
+  const rowSpacing    = effectBoxH + 8;
   const spread        = Math.min(VH * 0.9, effectsPerCol * rowSpacing);
   const startY        = VH / 2 - spread / 2;
 
@@ -476,22 +477,21 @@ function drawEffectsLayout(effects, anchorLabel) {
       : startY + (row / (effectsPerCol - 1 || 1)) * spread;
     // const sc  = STATUS_COLORS[eff.status] || STATUS_COLORS.unknown;
 
-    let lines = wrap(eff.name, wrapCh);
-    // Always fixed radius — truncate overflow with ellipsis to prevent height growth
-    const r = baseR;
-    if (lines.length > maxLines) {
-      lines = lines.slice(0, maxLines);
-      lines[maxLines - 1] = lines[maxLines - 1].replace(/.\s*$/, '…');
+    let lines = wrap(eff.name, effectWrapCh);
+    if (lines.length > effectMaxLines) {
+      lines = lines.slice(0, effectMaxLines);
+      lines[effectMaxLines - 1] = lines[effectMaxLines - 1].replace(/.\s*$/, '…');
     }
 
     const node = makeNode({
-      id:'eff_'+i, x:tx, y:ty, r,
-      color:discColor, lines, fs:nodeFs,
+      id:'eff_'+i, x:tx, y:ty, r:effectR,
+      color:discColor, lines, fs:effectFs,
+      boxWidth: effectBoxW, boxHeight: effectBoxH,
       // statusColor:sc,
       onClick:()=>openEffect(eff.id),
     });
-    spawnNode(node, dAnchorX, dAnchorY, tx, ty, r, 60 + i * delayStep);
-    liveNodes.set('eff_'+i, { el:node, x:tx, y:ty, r, color:discColor });
+    spawnNode(node, dAnchorX, dAnchorY, tx, ty, effectR, 60 + i * delayStep);
+    liveNodes.set('eff_'+i, { el:node, x:tx, y:ty, r:effectR, color:discColor });
     if (i < 60) setTimeout(()=>makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
   });
 
