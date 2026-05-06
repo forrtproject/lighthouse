@@ -1,6 +1,6 @@
 # About FORRT Lighthouse
 
-FORRT Lighthouse is a place for researchers, teachers, and practitioners to learn about research topics and areas in a guided way. What sets it apart from other sources of knowledge is that it integrates various different sources. The version you are viewing is a prototype that we are working to polisch and expand with the help of the research community. [Get in touch][1] if you want to help us coordinate Lighthouse entries in specific (sub)disciplines.
+FORRT Lighthouse is a place for researchers, teachers, and practitioners to learn about research topics and areas in a guided way. What sets it apart from other sources of knowledge is that it integrates various different sources. The version you are viewing is a prototype that we are working to polish and expand with the help of the research community. [Get in touch][1] if you want to help us coordinate Lighthouse entries in specific (sub)disciplines.
 
 ## Data & Validation
 
@@ -20,9 +20,9 @@ For each of the research phenomena, you can recommend research items, such as re
 
 ## Contributors
 
-The Lighthouse concept and this prototype was created by Riva Quiroga, Kudakwashe Siziva, Priti, Lukas (Luke) Röseler, Lukas Wallrich, and Flavio Azevedo. If you use it for your work, please cite it as:
+The Lighthouse concept and this prototype was created by Riva Quiroga, Kudakwashe Siziva, Priti Chahal, Lukas (Luke) Röseler, Lukas Wallrich, and Flavio Azevedo. If you use it for your work, please cite it as:
 
-> Quiroga, R., Siziva, K., Priti, Röseler, L., Wallrich, L., & Azevedo, F. (2026). FORRT Lighthouse [Website]. https://www.lighthouse.forrt.org
+> Quiroga, R., Siziva, K., Chahal, P, Röseler, L., Wallrich, L., & Azevedo, F. (2026). FORRT Lighthouse [Website]. https://www.lighthouse.forrt.org
 
 [1]: mailto:info@forrt.org
 [2]: https://forrt.org/reversals/
