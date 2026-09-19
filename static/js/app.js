@@ -73,6 +73,23 @@ window.addEventListener('resize', () => {
 });
 resize();
 
+// ── ESCAPING ───────────────────────────────────────────────────────────────
+// All spreadsheet text goes through esc() before it is put into innerHTML.
+// Summaries routinely contain "<" and "&" (e.g. "p<.05", "Smith & Jones").
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, ch => (
+    { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]
+  ));
+}
+function cleanDoi(v) {
+  let doi = String(v ?? '').trim();
+  try { doi = decodeURIComponent(doi); } catch (_) { /* keep as is */ }
+  doi = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+  return /^10\.\d{4,9}\/\S+$/.test(doi) ? doi : '';   // drops "not available" etc.
+}
+const doiHref = doi => `https://doi.org/${encodeURI(doi)}`;
+const safeUrl = v => (/^https?:\/\//i.test(String(v ?? '').trim()) ? String(v).trim() : '');
+
 // ── API ────────────────────────────────────────────────────────────────────
 async function api(path) {
   const r = await fetch(path);
@@ -526,7 +543,7 @@ const STATUS_BG = {
 };
 
 async function openEffect(effectId) {
-  const data = await api(`/api/effect/${effectId}`);
+  const data = await api(`/api/effect/${encodeURIComponent(effectId)}`);
   tlTitle.textContent = data.name;
   tlDesc.textContent = data.description || '';
   // const sc = STATUS_COLORS[data.status] || STATUS_COLORS.unknown;
@@ -552,50 +569,51 @@ async function openEffect(effectId) {
     row.style.animationDelay = (i*45)+'ms';
     if (p.type === 'paper'){
   
-      const retraction_badge = `<div id="tl-status-badge"><span class="status-badge" style="background:${STATUS_BG.reversed};color:${STATUS_COLORS.reversed}">Retracted</span></div>`;
+      const retraction_badge = `<div class="tl-retraction-badge"><span class="status-badge" style="background:${STATUS_BG.reversed};color:${STATUS_COLORS.reversed}">Retracted</span></div>`;
   
   
-      const doiHtml = p.doi && p.doi !== 'nan'
-        ? `<a class="tl-doi" href="https://doi.org/${p.doi}" target="_blank" rel="noopener">doi:${p.doi}</a>`
+      const doi = cleanDoi(p.doi);
+      const doiHtml = doi
+        ? `<a class="tl-doi" href="${esc(doiHref(doi))}" target="_blank" rel="noopener">doi:${esc(doi)}</a>`
         : '';
       const apaHtml = p.apa && p.apa !== 'nan' && p.apa !== p.doi
-        ? `<div class="tl-journal" style="margin-top:3px;font-style:normal;font-size:10px;opacity:.7">${p.apa.substring(0,120)}${p.apa.length>120?'…':''}</div>`
+        ? `<div class="tl-journal" style="margin-top:3px;font-style:normal;font-size:10px;opacity:.7">${esc(p.apa.substring(0,120))}${p.apa.length>120?'…':''}</div>`
         : '';
   
       row.innerHTML = `
-        <div class="tl-year" style="color:${tc.c};opacity:.8">${p.year ?? '—'}</div>
+        <div class="tl-year" style="color:${tc.c};opacity:.8">${esc(p.year ?? '—')}</div>
         <div class="tl-dot-wrap">
           <div class="tl-dot" style="border-color:${tc.c};color:${tc.c}">${tc.shape}</div>
         </div>
         <div class="tl-content">
           <div class="tl-type" style="color:${tc.c}">${tc.label}</div>
-          <div class="tl-paper-title">${p.title||'Untitled'}</div>
+          <div class="tl-paper-title">${esc(p.title||'Untitled')}</div>
           ${p.retracted ? retraction_badge : ''}
           ${apaHtml}
-          <div class="tl-summary">${p.summary||''}</div>
+          <div class="tl-summary">${esc(p.summary||'')}</div>
           ${doiHtml}
         </div>`;
     } else {
       const validation = (p.validation || '').toLowerCase();
       const isMoreGeneral = validation.includes('more general');
-      const hasUrl = !!p.url && p.url !== 'nan';
+      const wikiUrl = safeUrl(p.url);
 
       const wikiLinkLabel = isMoreGeneral
         ? `Featured in: ${p.title || 'Wikipedia'}`
         : (p.title || 'Wikipedia article');
 
-      const wikiLinkHtml = hasUrl
-        ? `<a class="tl-doi" href="${p.url}" target="_blank" rel="noopener">${wikiLinkLabel}</a>`
-        : `<div class="tl-journal">${wikiLinkLabel}</div>`;
+      const wikiLinkHtml = wikiUrl
+        ? `<a class="tl-doi" href="${esc(wikiUrl)}" target="_blank" rel="noopener">${esc(wikiLinkLabel)}</a>`
+        : `<div class="tl-journal">${esc(wikiLinkLabel)}</div>`;
 
       row.innerHTML = `
-        <div class="tl-year" style="color:#7a5c00;opacity:.8">${p.year ?? p.wiki_year ?? '—'}</div>
+        <div class="tl-year" style="color:#7a5c00;opacity:.8">${esc(p.year ?? p.wiki_year ?? '—')}</div>
         <div class="tl-dot-wrap">
           <div class="tl-dot" style="border-color:#7a5c00;color:#7a5c00">W</div>
         </div>
         <div class="tl-content">
           <div class="tl-type" style="color:#7a5c00">Wikipedia</div>
-          <div class="tl-paper-title">${p.title || 'Untitled wiki entry'}</div>
+          <div class="tl-paper-title">${esc(p.title || 'Untitled wiki entry')}</div>
           ${wikiLinkHtml}
         </div>`;
     }
@@ -605,20 +623,22 @@ async function openEffect(effectId) {
   const fr = data.foundational_retraction;
 
   if (fr?.retracted) {
-    const originalDoiHtml = fr.original_doi
-      ? `<a class="tl-doi" href="https://doi.org/${fr.original_doi}" target="_blank" rel="noopener">Original DOI: ${fr.original_doi}</a>`
+    const origDoi = cleanDoi(fr.original_doi), retrDoi = cleanDoi(fr.retraction_doi);
+    const originalDoiHtml = origDoi
+      ? `<a class="tl-doi" href="${esc(doiHref(origDoi))}" target="_blank" rel="noopener">Original DOI: ${esc(origDoi)}</a>`
       : '';
 
-    const retractionDoiHtml = fr.retraction_doi
-      ? `<a class="tl-doi" href="https://doi.org/${fr.retraction_doi}" target="_blank" rel="noopener">Retraction DOI: ${fr.retraction_doi}</a>`
+    const retractionDoiHtml = retrDoi
+      ? `<a class="tl-doi" href="${esc(doiHref(retrDoi))}" target="_blank" rel="noopener">Retraction DOI: ${esc(retrDoi)}</a>`
       : '';
 
-    const pubmedHtml = fr.retraction_pubmed_id
-      ? `<a class="tl-doi" href="https://pubmed.ncbi.nlm.nih.gov/${fr.retraction_pubmed_id}/" target="_blank" rel="noopener">Retraction PubMed: ${fr.retraction_pubmed_id}</a>`
+    const pubmedId = /^\d+$/.test(String(fr.retraction_pubmed_id ?? '')) ? String(fr.retraction_pubmed_id) : '';
+    const pubmedHtml = pubmedId
+      ? `<a class="tl-doi" href="https://pubmed.ncbi.nlm.nih.gov/${pubmedId}/" target="_blank" rel="noopener">Retraction PubMed: ${pubmedId}</a>`
       : '';
 
     const retractionDateHtml = fr.retraction_date
-      ? `<div class="tl-retraction-meta">Retraction date: ${fr.retraction_date}</div>`
+      ? `<div class="tl-retraction-meta">Retraction date: ${esc(fr.retraction_date)}</div>`
       : '';
 
     const footer = document.createElement('div');
@@ -697,7 +717,7 @@ searchInput.addEventListener('input', () => {
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'sr-tag';
-          btn.innerHTML = `<span class="sr-tag-name">${tag.name}</span><span class="sr-tag-sep"> - </span><span class="sr-tag-meta">${tag.discipline}</span>`;
+          btn.innerHTML = `<span class="sr-tag-name">${esc(tag.name)}</span><span class="sr-tag-sep"> - </span><span class="sr-tag-meta">${esc(tag.discipline)}</span>`;
 
           const tagColor = colorForTag(tag.name);
           btn.style.borderColor = tagColor;
@@ -724,7 +744,7 @@ searchInput.addEventListener('input', () => {
 
         effects.forEach(r => {
           const div = document.createElement('div'); div.className = 'sr-item';
-          div.innerHTML = `<div class="sr-item-name">${r.name}</div><div class="sr-item-disc">${r.discipline}</div>`;
+          div.innerHTML = `<div class="sr-item-name">${esc(r.name)}</div><div class="sr-item-disc">${esc(r.discipline)}</div>`;
           div.addEventListener('click', () => {
             searchResults.classList.remove('open');
             searchInput.value = '';

@@ -312,7 +312,7 @@ body {
   font-size: 12px; color: var(--text2); line-height: 1.5;
   margin-top: 6px; max-height: 120px; overflow-y: auto;
 }
-#tl-status-badge { margin-top: 4px; }
+#tl-status-badge, .tl-retraction-badge { margin-top: 4px; }
 .status-badge {
   display: inline-block; font-size: 10px; font-weight: 600;
   padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: .04em;
