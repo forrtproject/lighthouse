@@ -85,7 +85,7 @@ function setBc() {
   const parts = [{ txt: 'All fields', action: () => jumpTo(0) }];
   if (state.field) parts.push({ txt: state.field, action: () => jumpTo(1) });
   if (state.disc)  parts.push({ txt: state.disc,  action: () => jumpTo(2) });
-  if (state.sub && state.sub !== state.disc) parts.push({ txt: state.sub, action: () => jumpTo(3) });
+  if (state.cluster) parts.push({ txt: state.cluster, action: () => jumpTo(3) });
   bc.innerHTML = '';
   parts.forEach((p, i) => {
     const last = i === parts.length - 1;
@@ -104,6 +104,7 @@ function jumpTo(lvl) {
   else if (lvl === 2 && state.disc)  { state = { ...state, level:2, sub:null, cluster:null, effect:null }; closeTimeline(); render(); }
   else if (lvl === 3 && state.cluster)   { state = { ...state, level:3, effect:null }; closeTimeline(); render(); }
   else if (lvl === 4 && state.effect) { state = { ...state, level:4 }; closeTimeline(); render(); }
+  else if (lvl > 0 && lvl < state.level) jumpTo(lvl - 1);  // target level has no state: keep going up rather than dead-end
 }
 
 backBtn.addEventListener('click', () => jumpTo(state.level - 1));
@@ -660,8 +661,10 @@ function colorForTag(name) {
   return DISC_COLORS[idx];
 }
 
-function openClusterFromSearch(clusterName, disciplineName) {
-  state.field = null;
+function openClusterFromSearch(clusterName, disciplineName, fieldName) {
+  // The field must be set too, or Back and the breadcrumb dead-end at the
+  // discipline level.
+  state.field = fieldName || null;
   state.disc = disciplineName;
   state.sub = disciplineName;
   state.cluster = clusterName;
@@ -703,7 +706,7 @@ searchInput.addEventListener('input', () => {
           btn.addEventListener('click', () => {
             searchResults.classList.remove('open');
             searchInput.value = '';
-            openClusterFromSearch(tag.name, tag.discipline);
+            openClusterFromSearch(tag.name, tag.discipline, tag.field);
           });
           grid.appendChild(btn);
         });
@@ -725,6 +728,10 @@ searchInput.addEventListener('input', () => {
           div.addEventListener('click', () => {
             searchResults.classList.remove('open');
             searchInput.value = '';
+            // Show the effect in its place on the map, not over an unrelated view.
+            if (r.clusters?.length && !(state.level === 3 && r.clusters.includes(state.cluster))) {
+              openClusterFromSearch(r.clusters[0], r.discipline, r.field);
+            }
             openEffect(r.id);
           });
           searchResults.appendChild(div);

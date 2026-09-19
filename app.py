@@ -60,6 +60,7 @@ class DataStore:
 
         self.fields: dict[str, list[str]] = self._build_fields()
         self.disciplines: list[dict] = self._build_disciplines()
+        self._field_by_disc: dict[str, str] = {d["name"]: d["field"] for d in self.disciplines}
 
         logger.info(
             "DataStore loaded: %d effects, %d papers, %d disciplines",
@@ -124,7 +125,9 @@ class DataStore:
                 effect_results.append({
                     "id": e["id"],
                     "name": e["name"],
+                    "field": e.get("field") or "Other",
                     "discipline": e["discipline"],
+                    "clusters": e.get("clusters", []),
                     "status": e["status"],
                 })
                 if len(effect_results) >= limit:
@@ -141,6 +144,7 @@ class DataStore:
                     )
                     cluster_results.append({
                         "name": cluster,
+                        "field": self._field_by_disc.get(disc, "Other"),
                         "discipline": disc,
                         "effect_count": count,
                     })
