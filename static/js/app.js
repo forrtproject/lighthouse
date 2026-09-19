@@ -33,6 +33,8 @@ function hexAlpha(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+const HUB_COLOR = '#22ABA6';
+
 const STATUS_COLORS = {
   replicated:'#2d9b5c', not_replicated:'#e05c30', mixed:'#c49a00',
   reversed:'#993556', unknown:'#888780'
@@ -63,7 +65,12 @@ function resize() {
   svg.setAttribute('width', VW);
   svg.setAttribute('height', VH);
 }
-window.addEventListener('resize', () => { resize(); render(); });
+let resizeTimer;
+window.addEventListener('resize', () => {
+  // Debounced: a window drag fires dozens of resize events.
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { resize(); render(); }, 150);
+});
 resize();
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -255,7 +262,17 @@ function wrap(label, maxCh=14) {
 }
 
 // ── RENDER STATE MACHINE ───────────────────────────────────────────────────
+// Every render() gets a sequence number. Renders are async (they await the
+// API) and schedule delayed work, so an older render must stop touching the
+// SVG once a newer one has started. Otherwise views stack on top of each other.
+let renderSeq = 0;
+const isStale = seq => seq !== renderSeq;
+function later(seq, fn, ms) {
+  setTimeout(() => { if (!isStale(seq)) fn(); }, ms);
+}
+
 async function render() {
+  const seq = ++renderSeq;
   resize(); setBc(); clearEdges();
 
   // Remove non-anchor nodes with fade
@@ -268,22 +285,23 @@ async function render() {
 
   if (state.level === 0) {
     hint.textContent = 'Click a field to explore disciplines';
-    await renderFields();
+    await renderFields(seq);
   } else if (state.level === 1) {
     hint.textContent = 'Click a discipline';
-    await renderDiscs();
+    await renderDiscs(seq);
   } else if (state.level === 2) {
     hint.textContent = 'Click a cluster to filter effects';
-    await renderClusters();
+    await renderClusters(seq);
   } else if (state.level === 3) {
     hint.textContent = 'Click an effect to see evidence';
-    await renderEffectsByCluster();
+    await renderEffectsByCluster(seq);
   }
 }
 
 // Level 0: Fields as big bubbles
-async function renderFields() {
+async function renderFields(seq) {
   const fields = await api('/api/fields');
+  if (isStale(seq)) return;
   const names = Object.keys(fields);
   const cx = VW/2, cy = VH/2;
   const rx = Math.min(VW, VH) * 0.31;
@@ -294,14 +312,14 @@ async function renderFields() {
 
   const hub = makeNode({
     id:'__hub__', x:cx, y:cy, r:25,
-    color:'22ABA6', lines:['All', 'Disciplines'], fs:20, kind:'hub',
+    color:HUB_COLOR, lines:['All', 'Disciplines'], fs:20, kind:'hub',
     onClick:() => jumpTo(0),
   });
   hub.setAttribute('transform', `translate(${cx},${cy})`);
   hub.style.opacity = '0';
   svg.appendChild(hub);
   setTimeout(() => { hub.style.transition='opacity .3s'; hub.style.opacity='1'; }, 50);
-  liveNodes.set('__hub__', { el:hub, x:cx, y:cy, r:18 });
+  liveNodes.set('__hub__', { el:hub, x:cx, y:cy, r:18, color:HUB_COLOR });
 
   names.forEach((name, i) => {
     const a = (i/names.length)*Math.PI*2 - Math.PI/2;
@@ -315,13 +333,14 @@ async function renderFields() {
     });
     spawnNode(node, cx, cy, tx, ty, r, 60+i*35);
     liveNodes.set('field_'+i, { el:node, x:tx, y:ty, r, color });
-    setTimeout(() => makeEdge(cx, cy, tx, ty, color, 0), 80+i*35);
+    later(seq, () => makeEdge(cx, cy, tx, ty, color, 0), 80+i*35);
   });
 }
 
 // Level 1: Disciplines for selected field
-async function renderDiscs() {
+async function renderDiscs(seq) {
   const allDiscs = await api('/api/disciplines');
+  if (isStale(seq)) return;
   const discs = allDiscs.filter(d => d.field === state.field);
   const cx = VW*0.32, cy = VH/2;
   const anchorX = 70, anchorY = cy;
@@ -336,7 +355,7 @@ async function renderDiscs() {
   anchor.setAttribute('transform', `translate(${anchorX},${anchorY})`);
   svg.appendChild(anchor);
   setTimeout(()=>{ anchor.style.transition='opacity .3s'; anchor.style.opacity='1'; },30);
-  liveNodes.set('__field__', { el:anchor, x:anchorX, y:anchorY, r:36, color });
+  liveNodes.set('__field__', { el:anchor, x:anchorX, y:anchorY, r:36, color, kind:'anchor' });
 
   const n = discs.length;
   const spread = Math.min(VH*0.82, n*84);
@@ -354,13 +373,14 @@ async function renderDiscs() {
     });
     spawnNode(node, anchorX, anchorY, tx, ty, r, 80+i*40);
     liveNodes.set('disc_'+i, { el:node, x:tx, y:ty, r, color:dc });
-    setTimeout(()=>makeEdge(anchorX, anchorY, tx, ty, dc, 0), 110+i*40);
+    later(seq, () => makeEdge(anchorX, anchorY, tx, ty, dc, 0), 110+i*40);
   });
 }
 
 // Level 2: Clusters for selected discipline
-async function renderClusters() {
+async function renderClusters(seq) {
   const clusters = await api(`/api/clusters/${encodeURIComponent(state.disc)}`);
+  if (isStale(seq)) return;
   const cy = VH/2;
   const anchorX = 70, anchorY = cy;
 
@@ -374,7 +394,7 @@ async function renderClusters() {
   anchor.setAttribute('transform', `translate(${anchorX},${anchorY})`);
   svg.appendChild(anchor);
   setTimeout(()=>{ anchor.style.transition='opacity .3s'; anchor.style.opacity='1'; },30);
-  liveNodes.set('__disc__', { el:anchor, x:anchorX, y:anchorY, r:36, color });
+  liveNodes.set('__disc__', { el:anchor, x:anchorX, y:anchorY, r:36, color, kind:'anchor' });
 
   const n = clusters.length;
   const tlOpen = document.getElementById('timeline-panel').classList.contains('open');
@@ -406,27 +426,18 @@ async function renderClusters() {
     const delayStep = Math.max(6, Math.min(18, Math.floor(650 / (n || 1))));
     spawnNode(node, anchorX, anchorY, tx, ty, r, 80 + i * delayStep);
     liveNodes.set('clust_'+i, { el:node, x:tx, y:ty, r, color:cc });
-    setTimeout(()=>makeEdge(anchorX, anchorY, tx, ty, cc, 0), 110 + i * delayStep);
+    later(seq, () => makeEdge(anchorX, anchorY, tx, ty, cc, 0), 110 + i * delayStep);
   });
 }
 
 // Level 3: Effects for selected cluster
-async function renderEffectsByCluster() {
+async function renderEffectsByCluster(seq) {
   const effects = await api(`/api/effects?cluster=${encodeURIComponent(state.cluster)}`);
-  drawEffectsLayout(effects, state.cluster);
+  if (isStale(seq)) return;
+  drawEffectsLayout(effects, state.cluster, seq);
 }
 
-// Level 2: Effects for selected discipline (flat, since sub == disc)
-async function renderEffects() {
-  const effects = await api(`/api/effects?discipline=${encodeURIComponent(state.disc)}`);
-  drawEffectsLayout(effects, state.disc);
-}
-async function renderEffectsInSub() {
-  const effects = await api(`/api/effects?sub_discipline=${encodeURIComponent(state.sub)}`);
-  drawEffectsLayout(effects, state.sub);
-}
-
-function drawEffectsLayout(effects, anchorLabel) {
+function drawEffectsLayout(effects, anchorLabel, seq) {
   const discColor = getDiscColor(state.disc||state.field);
   const effectFs = 10;
   const effectBoxSample = 'Better-than-average effect';
@@ -447,7 +458,7 @@ function drawEffectsLayout(effects, anchorLabel) {
   dAnchor.setAttribute('transform', `translate(${dAnchorX},${dAnchorY})`);
   svg.appendChild(dAnchor);
   setTimeout(()=>{ dAnchor.style.transition='opacity .3s'; dAnchor.style.opacity='1'; },20);
-  liveNodes.set('__disc__', { el:dAnchor, x:dAnchorX, y:dAnchorY, r:30, color:discColor });
+  liveNodes.set('__disc__', { el:dAnchor, x:dAnchorX, y:dAnchorY, r:30, color:discColor, kind:'anchor' });
 
   const tlOpen = document.getElementById('timeline-panel').classList.contains('open');
   const rightEdge = tlOpen ? VW - 400 : VW - 20;
@@ -492,7 +503,7 @@ function drawEffectsLayout(effects, anchorLabel) {
     });
     spawnNode(node, dAnchorX, dAnchorY, tx, ty, effectR, 60 + i * delayStep);
     liveNodes.set('eff_'+i, { el:node, x:tx, y:ty, r:effectR, color:discColor });
-    if (i < 60) setTimeout(()=>makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
+    if (i < 60) later(seq, () => makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
   });
 
   if (n === 0) hint.textContent = 'No effects found for this discipline';
@@ -893,7 +904,7 @@ function draw() { /* refresh color fills on theme change */
       c.setAttribute('fill', darkMode ? hexAlpha(n.color,.35) : hexAlpha(n.color,.18));
     }
     const t = n.el.querySelector('text');
-    if (t) t.setAttribute('fill', darkMode ? '#e0ddd5' : n.color);
+    if (t && n.color) t.setAttribute('fill', darkMode ? '#e0ddd5' : (n.kind==='anchor' ? hexAlpha(n.color,0.7) : n.color));
   });
 }
 
