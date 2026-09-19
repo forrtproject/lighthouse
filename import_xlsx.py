@@ -211,6 +211,30 @@ def load_retractions_index(csv_path: Path, wanted_dois: set[str] | None = None) 
         for _, row in df.iterrows()
     }
 
+def merge_duplicate_effects(effects: list[dict]) -> tuple[list[dict], dict[str, int]]:
+    """Collapse rows that share an effect id (i.e. the same name).
+
+    The app addresses effects by id, so repeated rows cannot be told apart:
+    they show up as identical boxes that all open the same evidence. The first
+    row wins; clusters are unioned and an empty description is filled from a
+    later row. Returns the merged list and {name: row count} for reporting.
+    """
+    merged: dict[str, dict] = {}
+    counts: dict[str, int] = {}
+    for e in effects:
+        kept = merged.get(e["id"])
+        if kept is None:
+            merged[e["id"]] = e
+            counts[e["id"]] = 1
+            continue
+        counts[e["id"]] += 1
+        kept["clusters"] += [c for c in e["clusters"] if c not in kept["clusters"]]
+        if not kept["description"]:
+            kept["description"] = e["description"]
+    duplicates = {merged[i]["name"]: n for i, n in counts.items() if n > 1}
+    return list(merged.values()), duplicates
+
+
 def run(
     xlsx_path: str,
     retractions_csv_path: str = DEFAULT_RETRACTIONS_CSV,
@@ -251,6 +275,9 @@ def run(
             'status': norm_status(row.get('current_status_normalised') or row.get('current_status')),
             'clusters': clusters,
         })
+    effects, duplicates = merge_duplicate_effects(effects)
+    for name, count in duplicates.items():
+        print(f"WARNING: effect listed {count} times, merged into one: {name!r}")
     print(f"Parsed {len(effects)} effects from {xlsx_path}")
 
     papers = []
