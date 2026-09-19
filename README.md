@@ -68,6 +68,19 @@ uv run python import_xlsx.py path/to/FORRT_Lighthouse_Data.xlsx
 
 This regenerates `data/data.json`. Restart the server to pick up the changes.
 
+### Retraction data
+
+The import flags retracted papers using the [Retraction Watch dataset](https://gitlab.com/crossref/retraction-watch-data). Only the columns the app needs are kept, in `data/retraction_watch.csv`, and that copy is reused for 7 days before it is downloaded again. Only notices of type "Retraction" count; corrections and expressions of concern do not.
+
+```bash
+# download the latest retraction data now
+uv run python import_xlsx.py --refresh-retractions
+# change how long the cached copy is trusted
+uv run python import_xlsx.py --retractions-max-age-days 1
+```
+
+If a refresh fails, the existing copy is used with a warning. With no copy at all the import stops with an error.
+
 ### Key columns in effects_review
 
 | Column | Description |
