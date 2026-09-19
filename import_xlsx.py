@@ -36,8 +36,30 @@ RETRACTIONS_CSV_URL = (
     "retraction_watch.csv?ref_type=heads&inline=false"
 )
 
+def clean_text(value: object) -> str:
+    """Normalise a spreadsheet string.
+
+    - Repairs mojibake where UTF-8 was decoded as Latin-1/cp1252
+      (e.g. "womenâ\x80\x99s" -> "women’s"). Without this, effect names in one
+      sheet do not match the same names in the other sheets.
+    - Drops zero-width characters and surrounding whitespace.
+    """
+    s = str(value)
+    for codec in ("latin-1", "cp1252"):
+        try:
+            repaired = s.encode(codec).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+        if repaired != s:
+            s = repaired
+            break
+    return re.sub(r"[\u200b\u200c\u200d\ufeff]", "", s).strip()
+
+
 def make_id(name):
-    return re.sub(r'[^a-z0-9_]', '_', str(name).lower().strip())[:60].strip('_')
+    # No length cap: truncating made distinct long effect names share one id.
+    slug = re.sub(r'[^a-z0-9]+', '_', clean_text(name).lower())
+    return slug.strip('_')
 
 def norm_status(s):
     if pd.isna(s): return 'unknown'
@@ -137,10 +159,10 @@ def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
 
     effects = []
     for _, row in effects_df.iterrows():
-        name = str(row['effect_name']).strip()
+        name = clean_text(row['effect_name'])
         disc = str(row.get('discipline', row.get('sub_discipline',''))).strip()
         sub  = str(row.get('sub_discipline', disc)).strip()
-        desc = str(row.get('description', row.get('cleaned_description',''))).strip()
+        desc = clean_text(row.get('description', row.get('cleaned_description','')))
         if not desc or desc == 'nan': desc = ''
         
         # Extract clusters from cluster_a, cluster_b, cluster_c columns
@@ -162,7 +184,7 @@ def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
 
     papers = []
     for _, row in papers_df.iterrows():
-        en = str(row['effect_name']).strip() if pd.notna(row.get('effect_name')) else ''
+        en = clean_text(row['effect_name']) if pd.notna(row.get('effect_name')) else ''
         doi = str(row.get('doi','')).strip() if pd.notna(row.get('doi')) else ''
         doi_norm = normalize_doi(doi)
         retraction_meta = retractions_index.get(
@@ -177,12 +199,12 @@ def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
 
         papers.append({
             'effect_name': en, 'effect_id': make_id(en),
-            'title': str(row.get('title','')).strip() if pd.notna(row.get('title')) else '',
+            'title': clean_text(row.get('title','')) if pd.notna(row.get('title')) else '',
             'doi':   doi,
             'year':  int(row['year']) if pd.notna(row.get('year')) else None,
-            'apa':   str(row.get('apa_reference','')).strip() if pd.notna(row.get('apa_reference')) else '',
+            'apa':   clean_text(row.get('apa_reference','')) if pd.notna(row.get('apa_reference')) else '',
             'classification': norm_class(row.get('current_classification')),
-            'summary': str(row.get('summary','')).strip() if pd.notna(row.get('summary')) else '',
+            'summary': clean_text(row.get('summary','')) if pd.notna(row.get('summary')) else '',
             "retracted": retraction_meta["retracted"],
             "retraction_doi": retraction_meta["retraction_doi"],
             "retraction_date": retraction_meta["retraction_date"],
@@ -193,7 +215,7 @@ def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
 
     wikis = []
     for _, row in effects_wikipaedia_df.iterrows():
-        name = str(row['effect_name']).strip()
+        name = clean_text(row['effect_name'])
         wikis.append({
             'effect_id': make_id(name),
             'name': name,
