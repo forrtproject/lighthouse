@@ -132,6 +132,14 @@ def load_retractions_index(csv_path: Path) -> dict[str, dict]:
     if missing:
         raise ValueError(f"Missing required columns in retractions CSV: {sorted(missing)}")
 
+    # The dataset also lists corrections, expressions of concern and
+    # reinstatements. Only a retraction that was not later reinstated counts.
+    if "RetractionNature" in df.columns:
+        nature = df["RetractionNature"].fillna("").str.strip().str.lower()
+        reinstated = set(df.loc[nature == "reinstatement", "OriginalPaperDOI"].map(normalize_doi))
+        df = df[nature == "retraction"]
+        df = df[~df["OriginalPaperDOI"].map(normalize_doi).isin(reinstated - {""})]
+
     idx: dict[str, dict] = {}
     for _, row in df.iterrows():
         original_doi = normalize_doi(row.get("OriginalPaperDOI"))
