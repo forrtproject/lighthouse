@@ -9,6 +9,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
@@ -45,6 +46,7 @@ def clean_text(value: object) -> str:
     - Repairs mojibake where UTF-8 was decoded as Latin-1/cp1252
       (e.g. "womenâ\x80\x99s" -> "women’s"). Without this, effect names in one
       sheet do not match the same names in the other sheets.
+    - Decodes HTML entities ("&amp;" -> "&").
     - Drops zero-width characters and surrounding whitespace.
     """
     s = str(value)
@@ -56,6 +58,9 @@ def clean_text(value: object) -> str:
         if repaired != s:
             s = repaired
             break
+    # Some cells were pasted from HTML and hold entities such as "&amp;".
+    # The app escapes text itself, so store the plain character.
+    s = html.unescape(s)
     return re.sub(r"[\u200b\u200c\u200d\ufeff]", "", s).strip()
 
 
