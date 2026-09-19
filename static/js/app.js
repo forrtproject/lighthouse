@@ -58,12 +58,17 @@ const hint = document.getElementById('hint');
 const backBtn = document.getElementById('back-btn');
 
 // ── RESIZE ─────────────────────────────────────────────────────────────────
-function resize() {
-  const rect = stage.getBoundingClientRect();
-  VW = rect.width; VH = rect.height;
-  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+const scroller = document.getElementById('net-scroll');
+function setSvgHeight(h) {
+  svg.setAttribute('viewBox', `0 0 ${VW} ${h}`);
   svg.setAttribute('width', VW);
-  svg.setAttribute('height', VH);
+  svg.setAttribute('height', h);
+}
+function resize() {
+  // VW/VH are the visible area. The SVG itself may be taller (see
+  // drawEffectsLayout), in which case #net-scroll scrolls it.
+  VW = scroller.clientWidth; VH = scroller.clientHeight;
+  setSvgHeight(VH);
 }
 let resizeTimer;
 window.addEventListener('resize', () => {
@@ -185,7 +190,19 @@ function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick, bo
 
   if (onClick) {
     g.addEventListener('click', onClick);
-    g.addEventListener('touchend', e => { e.preventDefault(); onClick(); });
+    // Treat a touch as a tap only if the finger barely moved, so dragging to
+    // scroll a long list does not open whatever node the finger started on.
+    let touchStart = null;
+    g.addEventListener('touchstart', e => {
+      const t = e.touches[0]; touchStart = { x: t.clientX, y: t.clientY };
+    }, { passive: true });
+    g.addEventListener('touchend', e => {
+      const t = e.changedTouches[0];
+      const moved = !touchStart || Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) > 10;
+      touchStart = null;
+      if (moved) return;
+      e.preventDefault(); onClick();
+    });
   }
   return g;
 }
@@ -293,12 +310,14 @@ function later(seq, fn, ms) {
 
 async function render() {
   const seq = ++renderSeq;
-  resize(); setBc(); clearEdges();
+  scroller.scrollTop = 0;
+  resize(); setBc(); clearEdges(); updateScrollCue();
 
   // Remove non-anchor nodes with fade
   liveNodes.forEach((n, id) => {
     n.el.style.transition = 'opacity .25s';
     n.el.style.opacity = '0';
+    n.el.classList.remove('lh-selected');  // outgoing copy must not be mistaken for the live one
     setTimeout(() => n.el.parentNode?.removeChild(n.el), 260);
   });
   liveNodes.clear();
@@ -470,9 +489,8 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
   const discColor = getDiscColor(state.disc||state.field);
   const effectFs = 10;
   const effectBoxSample = 'Better-than-average effect';
-  const effectBoxW = Math.ceil(effectBoxSample.length * effectFs * 0.62 + 18);
+  const minBoxW = Math.ceil(effectBoxSample.length * effectFs * 0.62 + 18);
   const effectBoxH = 60;
-  const effectWrapCh = effectBoxSample.length;
   const effectLineHeight = effectFs + 3;
   const effectMaxLines = Math.max(1, Math.floor((effectBoxH - 10) / effectLineHeight));
   const effectR = effectBoxH / 2;
@@ -495,16 +513,31 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
   const n = effects.length;
 
   // Adaptive layout: scale columns, radius, font, and wrap width with effect count
-  const numCols = n > 100 ? 6 : n > 70 ? 5 : n > 40 ? 4 : n > 20 ? 3 : n > 10 ? 2 : 1;
+  const preferredCols = n > 100 ? 6 : n > 70 ? 5 : n > 40 ? 4 : n > 20 ? 3 : n > 10 ? 2 : 1;
 
-  const effectsPerCol = Math.ceil(n / numCols);
-  const rowSpacing    = effectBoxH + 8;
-  const spread        = Math.min(VH * 0.9, effectsPerCol * rowSpacing);
-  const startY        = VH / 2 - spread / 2;
+  // Boxes have a fixed size, so never squeeze more rows or columns in than
+  // physically fit. Use extra columns before resorting to vertical scrolling.
+  const rowSpacing = effectBoxH + 8;
+  const colSpacing = minBoxW + 10;
+  const padY       = 16;
+  const padBottom  = 48;   // keeps the last row clear of the hint line
+  const maxRows    = Math.max(1, Math.floor((VH - 2 * padY) / rowSpacing));
+  const maxCols    = Math.max(1, Math.floor((rightEdge - leftEdge) / colSpacing));
+  const numCols    = Math.max(1, Math.min(maxCols, Math.max(preferredCols, Math.ceil(n / maxRows))));
+
+  const effectsPerCol = Math.ceil(n / numCols) || 1;
+  const contentH      = effectsPerCol * rowSpacing;
+  const fits          = contentH <= VH - 2 * padY;
+  if (!fits) setSvgHeight(contentH + padY + padBottom);
+  const startY = fits ? VH / 2 - (contentH - rowSpacing) / 2 : padY + effectBoxH / 2;
 
   // Distribute columns evenly across available horizontal space
   const colW   = (rightEdge - leftEdge) / numCols;
   const startX = leftEdge + colW / 2;
+
+  // Let boxes grow into spare column width so fewer names get cut off.
+  const effectBoxW   = Math.max(minBoxW, Math.min(300, Math.floor(colW - 24)));
+  const effectWrapCh = Math.floor((effectBoxW - 18) / (effectFs * 0.62));
 
   // Stagger spawn so last node appears within ~600 ms regardless of count
   const delayStep = Math.max(4, Math.min(18, Math.floor(600 / (n || 1))));
@@ -513,8 +546,7 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
     const col = Math.floor(i / effectsPerCol);
     const row = i % effectsPerCol;
     const tx  = startX + col * colW;
-    const ty  = effectsPerCol === 1 ? VH / 2
-      : startY + (row / (effectsPerCol - 1 || 1)) * spread;
+    const ty  = startY + row * rowSpacing;
     // const sc  = STATUS_COLORS[eff.status] || STATUS_COLORS.unknown;
 
     let lines = wrap(eff.name, effectWrapCh);
@@ -530,12 +562,19 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
       // statusColor:sc,
       onClick:()=>openEffect(eff.id),
     });
+    node.dataset.effectId = eff.id;
+    node.dataset.ty = ty;
+    // Long names are cut to fit the box; the full name shows on hover.
+    const tip = document.createElementNS(NS, 'title'); tip.textContent = eff.name; node.appendChild(tip);
+    if (eff.id === state.effect) node.classList.add('lh-selected');
     spawnNode(node, dAnchorX, dAnchorY, tx, ty, effectR, 60 + i * delayStep);
     liveNodes.set('eff_'+i, { el:node, x:tx, y:ty, r:effectR, color:discColor });
-    if (i < 60) later(seq, () => makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
+    later(seq, () => makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
   });
 
   if (n === 0) hint.textContent = 'No effects found for this discipline';
+  else if (!fits) hint.textContent = 'Click an effect to see evidence · scroll for more';
+  updateScrollCue();
 }
 
 // ── EFFECT DETAIL / TIMELINE ───────────────────────────────────────────────
@@ -679,13 +718,44 @@ async function openEffect(effectId) {
   suggest.innerHTML = `<a href="/about#suggest-a-new-item">Suggest a new item</a>`;
   tlBody.appendChild(suggest);
 
+  const wasOpen = tlPanel.classList.contains('open');
   tlPanel.classList.add('open');
+  tlPanel.scrollTop = 0;
+  state.effect = effectId;
+  svg.querySelectorAll('.lh-selected').forEach(n => n.classList.remove('lh-selected'));
+  svg.querySelectorAll('.lh-node').forEach(n => { if (n.dataset.effectId === effectId) n.classList.add('lh-selected'); });
+  // The panel covers the right of the map: lay the effects out again beside it.
+  if (!wasOpen && state.level === 3) relayoutKeepingScroll();
 }
 
-function closeTimeline() {
-  tlPanel.classList.remove('open');
+function relayoutKeepingScroll() {
+  // Positions change when the column count changes, so the old scroll offset
+  // is meaningless. Bring the open effect back into view instead.
+  const top = scroller.scrollTop;
+  render().then(() => {
+    const sel = svg.querySelector('.lh-selected');
+    scroller.scrollTop = sel ? Math.max(0, parseFloat(sel.dataset.ty) - VH / 2) : top;
+    updateScrollCue();
+  });
 }
-document.getElementById('tl-close').addEventListener('click', closeTimeline);
+
+// Shows a fade and a "scroll for more" cue while content continues below.
+function updateScrollCue() {
+  const more = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop > 8;
+  stage.classList.toggle('more-below', more);
+}
+scroller.addEventListener('scroll', updateScrollCue, { passive: true });
+
+function closeTimeline() {
+  const wasOpen = tlPanel.classList.contains('open');
+  tlPanel.classList.remove('open');
+  state.effect = null;
+  svg.querySelectorAll('.lh-selected').forEach(n => n.classList.remove('lh-selected'));
+  return wasOpen;
+}
+document.getElementById('tl-close').addEventListener('click', () => {
+  if (closeTimeline() && state.level === 3) relayoutKeepingScroll();
+});
 
 // ── SEARCH ─────────────────────────────────────────────────────────────────
 const searchInput = document.getElementById('search-input');
@@ -811,7 +881,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (tourState) destroyTour(true);
   else if (searchResults.classList.contains('open')) { searchResults.classList.remove('open'); searchInput.blur(); }
-  else if (tlPanel.classList.contains('open')) closeTimeline();
+  else if (closeTimeline() && state.level === 3) relayoutKeepingScroll();
 });
 
 // ── ONBOARDING TOUR ───────────────────────────────────────────────────────
