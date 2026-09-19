@@ -282,7 +282,18 @@ body {
   overflow-x: hidden; overflow-y: auto;
 }
 #net-svg { display: block; }
-.lh-node.lh-selected .nbg { stroke-width: 3 !important; fill-opacity: 1; }
+#net-scroll { scrollbar-width: thin; }
+/* Fade at the bottom while more effects continue below the fold. */
+#stage::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 1;
+}
+#stage.more-below::after { opacity: 1; }
+/* Selected effect: neutral high-contrast outline, since every box in a
+   cluster shares the same hue. */
+.lh-node.lh-selected .nbg { stroke: var(--text) !important; stroke-width: 3 !important; }
+.lh-node.lh-selected .nlabel { font-weight: 700; }
 
 /* ─── SVG NODE STYLES ─── */
 .lh-node { cursor: pointer; }
@@ -370,7 +381,9 @@ body {
   position: absolute; bottom: 16px; left: 0; right: 0;
   text-align: center; font-size: 11px; color: var(--text3);
   pointer-events: none; opacity: .7; transition: right .38s;
+  z-index: 2;
 }
+#hint { text-shadow: 0 0 6px var(--bg), 0 0 6px var(--bg), 0 0 6px var(--bg); }
 #timeline-panel.open ~ #hint { right: 380px; }
 
 .tl-retraction-footer {

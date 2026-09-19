@@ -311,12 +311,13 @@ function later(seq, fn, ms) {
 async function render() {
   const seq = ++renderSeq;
   scroller.scrollTop = 0;
-  resize(); setBc(); clearEdges();
+  resize(); setBc(); clearEdges(); updateScrollCue();
 
   // Remove non-anchor nodes with fade
   liveNodes.forEach((n, id) => {
     n.el.style.transition = 'opacity .25s';
     n.el.style.opacity = '0';
+    n.el.classList.remove('lh-selected');  // outgoing copy must not be mistaken for the live one
     setTimeout(() => n.el.parentNode?.removeChild(n.el), 260);
   });
   liveNodes.clear();
@@ -488,9 +489,8 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
   const discColor = getDiscColor(state.disc||state.field);
   const effectFs = 10;
   const effectBoxSample = 'Better-than-average effect';
-  const effectBoxW = Math.ceil(effectBoxSample.length * effectFs * 0.62 + 18);
+  const minBoxW = Math.ceil(effectBoxSample.length * effectFs * 0.62 + 18);
   const effectBoxH = 60;
-  const effectWrapCh = effectBoxSample.length;
   const effectLineHeight = effectFs + 3;
   const effectMaxLines = Math.max(1, Math.floor((effectBoxH - 10) / effectLineHeight));
   const effectR = effectBoxH / 2;
@@ -518,8 +518,9 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
   // Boxes have a fixed size, so never squeeze more rows or columns in than
   // physically fit. Use extra columns before resorting to vertical scrolling.
   const rowSpacing = effectBoxH + 8;
-  const colSpacing = effectBoxW + 10;
+  const colSpacing = minBoxW + 10;
   const padY       = 16;
+  const padBottom  = 48;   // keeps the last row clear of the hint line
   const maxRows    = Math.max(1, Math.floor((VH - 2 * padY) / rowSpacing));
   const maxCols    = Math.max(1, Math.floor((rightEdge - leftEdge) / colSpacing));
   const numCols    = Math.max(1, Math.min(maxCols, Math.max(preferredCols, Math.ceil(n / maxRows))));
@@ -527,12 +528,16 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
   const effectsPerCol = Math.ceil(n / numCols) || 1;
   const contentH      = effectsPerCol * rowSpacing;
   const fits          = contentH <= VH - 2 * padY;
-  if (!fits) setSvgHeight(contentH + 2 * padY);
+  if (!fits) setSvgHeight(contentH + padY + padBottom);
   const startY = fits ? VH / 2 - (contentH - rowSpacing) / 2 : padY + effectBoxH / 2;
 
   // Distribute columns evenly across available horizontal space
   const colW   = (rightEdge - leftEdge) / numCols;
   const startX = leftEdge + colW / 2;
+
+  // Let boxes grow into spare column width so fewer names get cut off.
+  const effectBoxW   = Math.max(minBoxW, Math.min(300, Math.floor(colW - 24)));
+  const effectWrapCh = Math.floor((effectBoxW - 18) / (effectFs * 0.62));
 
   // Stagger spawn so last node appears within ~600 ms regardless of count
   const delayStep = Math.max(4, Math.min(18, Math.floor(600 / (n || 1))));
@@ -558,15 +563,18 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
       onClick:()=>openEffect(eff.id),
     });
     node.dataset.effectId = eff.id;
+    node.dataset.ty = ty;
     // Long names are cut to fit the box; the full name shows on hover.
     const tip = document.createElementNS(NS, 'title'); tip.textContent = eff.name; node.appendChild(tip);
     if (eff.id === state.effect) node.classList.add('lh-selected');
     spawnNode(node, dAnchorX, dAnchorY, tx, ty, effectR, 60 + i * delayStep);
     liveNodes.set('eff_'+i, { el:node, x:tx, y:ty, r:effectR, color:discColor });
-    if (i < 60) later(seq, () => makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
+    later(seq, () => makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
   });
 
   if (n === 0) hint.textContent = 'No effects found for this discipline';
+  else if (!fits) hint.textContent = 'Click an effect to see evidence · scroll for more';
+  updateScrollCue();
 }
 
 // ── EFFECT DETAIL / TIMELINE ───────────────────────────────────────────────
@@ -721,9 +729,22 @@ async function openEffect(effectId) {
 }
 
 function relayoutKeepingScroll() {
+  // Positions change when the column count changes, so the old scroll offset
+  // is meaningless. Bring the open effect back into view instead.
   const top = scroller.scrollTop;
-  render().then(() => { scroller.scrollTop = top; });
+  render().then(() => {
+    const sel = svg.querySelector('.lh-selected');
+    scroller.scrollTop = sel ? Math.max(0, parseFloat(sel.dataset.ty) - VH / 2) : top;
+    updateScrollCue();
+  });
 }
+
+// Shows a fade and a "scroll for more" cue while content continues below.
+function updateScrollCue() {
+  const more = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop > 8;
+  stage.classList.toggle('more-below', more);
+}
+scroller.addEventListener('scroll', updateScrollCue, { passive: true });
 
 function closeTimeline() {
   const wasOpen = tlPanel.classList.contains('open');
