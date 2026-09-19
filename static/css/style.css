@@ -270,10 +270,14 @@ body {
 }
 
 /* ─── STAGE ─── */
+/* #app is a column so the stage takes whatever the header and legend leave,
+   even when they wrap onto extra lines on narrow screens. */
+#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+#header, #legend { flex-shrink: 0; }
 #stage {
   position: relative;
   width: 100%;
-  height: calc(100vh - 52px - 32px);
+  flex: 1 1 auto; min-height: 0;
   overflow: hidden;
 }
 /* Scrolls vertically when a cluster has more effects than fit on screen. */
@@ -408,4 +412,26 @@ body {
   color: var(--text2);
   line-height: 1.4;
   margin-bottom: 4px;
+}
+
+/* ─── NARROW SCREENS ─── */
+@media (max-width: 1000px) {
+  #header { height: auto; flex-wrap: wrap; row-gap: 8px; padding: 8px 12px; }
+  #logo-wrap { order: 1; }
+  #header-right { order: 2; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; row-gap: 8px; flex-shrink: 1; min-width: 0; }
+  #breadcrumb { order: 3; flex: 1 0 100%; overflow-x: auto; scrollbar-width: none; }
+  #breadcrumb::-webkit-scrollbar { display: none; }
+  #breadcrumb .crumb { max-width: none; flex-shrink: 0; }
+  .logo-text { display: none; }
+  #home-link { display: none; }              /* the logo already links home */
+  #wip-badge { order: 10; flex: 1 0 100%; text-align: center; white-space: normal; }
+  #search-wrap { order: 9; flex: 1 0 100%; }
+  #search-input, #search-input:focus { width: 100%; font-size: 16px; }  /* 16px stops iOS zooming in on focus */
+  #search-results { left: 0; right: 0; width: auto; max-height: 60vh; overflow-y: auto; }
+  #legend { padding: 6px 12px; gap: 8px; }
+  .leg-group { flex-wrap: wrap; row-gap: 4px; }
+}
+@media (max-width: 600px) {
+  #timeline-panel { width: 100%; }
+  #timeline-panel.open ~ #hint { right: 0; }
 }

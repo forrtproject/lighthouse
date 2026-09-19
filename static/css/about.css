@@ -33,3 +33,6 @@ body { overflow: auto; }
   font-size: 13px; color: var(--text2); line-height: 1.7;
   padding-left: 20px; margin-bottom: 12px;
 }
+
+/* The about page scrolls as a normal document, unlike the fixed-height map. */
+#app { display: block; height: auto; }
