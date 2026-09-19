@@ -298,6 +298,16 @@ function wrap(label, maxCh=14) {
   return lines;
 }
 
+// Right-hand limit for node layout. When the evidence panel is open the map
+// is laid out beside it, unless the panel covers (nearly) the whole screen,
+// as it does on phones; then the map keeps its full-width layout underneath.
+function mapRightEdge() {
+  const panel = document.getElementById('timeline-panel');
+  if (!panel.classList.contains('open')) return VW - 20;
+  const free = VW - panel.offsetWidth - 20;
+  return free >= 260 ? free : VW - 20;
+}
+
 // ── RENDER STATE MACHINE ───────────────────────────────────────────────────
 // Every render() gets a sequence number. Renders are async (they await the
 // API) and schedule delayed work, so an older render must stop touching the
@@ -352,15 +362,18 @@ async function renderFields(seq) {
   if (isStale(seq)) return;
   const names = Object.keys(fields);
   const cx = VW/2, cy = VH/2;
-  const rx = Math.min(VW, VH) * 0.31;
-  const ry = Math.min(VW, VH) * 0.26;
+  // Landscape keeps the original near-circle. On portrait screens the ring
+  // stretches vertically and nodes shrink so neighbours do not overlap.
+  const portrait = VW < VH && VW < 600;
+  const rx = portrait ? VW * 0.33 : Math.min(VW, VH) * 0.31;
+  const ry = portrait ? VH * 0.36 : Math.min(VW, VH) * 0.26;
 
 
 
 
   const hub = makeNode({
     id:'__hub__', x:cx, y:cy, r:25,
-    color:HUB_COLOR, lines:['All', 'Disciplines'], fs:20, kind:'hub',
+    color:HUB_COLOR, lines:['All', 'Disciplines'], fs:portrait ? 14 : 20, kind:'hub',
     onClick:() => jumpTo(0),
   });
   hub.setAttribute('transform', `translate(${cx},${cy})`);
@@ -373,7 +386,7 @@ async function renderFields(seq) {
     const a = (i/names.length)*Math.PI*2 - Math.PI/2;
     const tx = cx + rx*Math.cos(a), ty = cy + ry*Math.sin(a);
     const color = getDiscColor(name);
-    const r = Math.min(54, Math.max(40, 680/names.length));
+    const r = portrait ? (VH < 520 ? 22 : 30) : Math.min(54, Math.max(40, 680/names.length));
     const node = makeNode({
       id:'field_'+i, x:tx, y:ty, r,
       color, lines:wrap(name, 12), fs:11,
@@ -390,7 +403,7 @@ async function renderDiscs(seq) {
   const allDiscs = await api('/api/disciplines');
   if (isStale(seq)) return;
   const discs = allDiscs.filter(d => d.field === state.field);
-  const cx = VW*0.32, cy = VH/2;
+  const cx = Math.max(VW*0.32, 190), cy = VH/2;   // 190 keeps clear of the anchor on phones
   const anchorX = 70, anchorY = cy;
 
   // Field anchor on left
@@ -406,8 +419,11 @@ async function renderDiscs(seq) {
   liveNodes.set('__field__', { el:anchor, x:anchorX, y:anchorY, r:36, color, kind:'anchor' });
 
   const n = discs.length;
-  const spread = Math.min(VH*0.82, n*84);
-  const startY = cy - spread/2;
+  const discSpacing = 92;                        // node height 84 + gap
+  const discFits = n * discSpacing <= VH - 24;
+  if (!discFits) setSvgHeight(n * discSpacing + 24);
+  const spread = (n - 1) * (discFits ? Math.min(discSpacing, (VH * 0.82) / Math.max(n - 1, 1)) : discSpacing);
+  const startY = discFits ? cy - spread/2 : 12 + discSpacing/2;
 
   discs.forEach((d, i) => {
     const tx = cx + (i%2===0 ? 0 : 55);
@@ -445,17 +461,24 @@ async function renderClusters(seq) {
   liveNodes.set('__disc__', { el:anchor, x:anchorX, y:anchorY, r:36, color, kind:'anchor' });
 
   const n = clusters.length;
-  const tlOpen = document.getElementById('timeline-panel').classList.contains('open');
-  const rightEdge = tlOpen ? VW - 400 : VW - 20;
+  const rightEdge = mapRightEdge();
   const leftEdge = anchorX + 95;
-  const numCols = n > 20 ? 4 : n > 12 ? 3 : n > 6 ? 2 : 1;
   const nodeFs = n > 20 ? 9 : 10;
   const wrapCh = n > 20 ? 11 : 13;
   const baseR = n > 20 ? 26 : n > 12 ? 28 : 30;
-  const perCol = Math.ceil(n / numCols);
   const rowSpacing = baseR * 2 + 12;
-  const spread = Math.min(VH * 0.85, perCol * rowSpacing);
-  const startY = VH / 2 - spread / 2;
+  // Same rule as the effects view: only as many rows and columns as fit,
+  // then scroll.
+  const clusterColW = wrapCh * nodeFs * 0.62 + 14 + 12;
+  const maxRows = Math.max(1, Math.floor((VH - 24) / rowSpacing));
+  const maxCols = Math.max(1, Math.floor((rightEdge - leftEdge) / clusterColW));
+  const preferredCols = n > 20 ? 4 : n > 12 ? 3 : n > 6 ? 2 : 1;
+  const numCols = Math.max(1, Math.min(maxCols, Math.max(preferredCols, Math.ceil(n / maxRows))));
+  const perCol = Math.ceil(n / numCols) || 1;
+  const clusterFits = perCol * rowSpacing <= VH - 24;
+  if (!clusterFits) setSvgHeight(perCol * rowSpacing + 24);
+  const spread = clusterFits ? Math.min(VH * 0.85, perCol * rowSpacing) : (perCol - 1) * rowSpacing;
+  const startY = clusterFits ? VH / 2 - spread / 2 : 12 + rowSpacing / 2;
   const colW = (rightEdge - leftEdge) / numCols;
   const startX = leftEdge + colW / 2;
 
@@ -507,8 +530,7 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
   setTimeout(()=>{ dAnchor.style.transition='opacity .3s'; dAnchor.style.opacity='1'; },20);
   liveNodes.set('__disc__', { el:dAnchor, x:dAnchorX, y:dAnchorY, r:30, color:discColor, kind:'anchor' });
 
-  const tlOpen = document.getElementById('timeline-panel').classList.contains('open');
-  const rightEdge = tlOpen ? VW - 400 : VW - 20;
+  const rightEdge = mapRightEdge();
   const leftEdge  = dAnchorX + 90;
   const n = effects.length;
 
