@@ -214,38 +214,25 @@ def get_effect(effect_id: str):
         return jsonify({"error": "Not found"}), 404
 
     papers = _store().papers_for_effect(effect_id)
-    wikis  = _store().wikis_for_effect(effect_id) 
-    foundational = [p for p in papers if p.get("classification") == "foundational"]
-    retracted_foundational = next((p for p in foundational if p.get("retracted")), None)
+    # Entries a curator marked as unrelated are never sent to the client.
+    wikis = [
+        w for w in _store().wikis_for_effect(effect_id)
+        if (w.get("validation") or "").strip().lower() != "non-related"
+    ]
 
+    foundational = [p for p in papers if p.get("classification") == "foundational"]
+    retracted = next((p for p in foundational if p.get("retracted")), None) or {}
     foundational_retraction = {
-        "retracted": bool(retracted_foundational),
-        "retraction_doi": retracted_foundational.get("retraction_doi") if retracted_foundational else None,
-        "retraction_date": retracted_foundational.get("retraction_date") if retracted_foundational else None,
-        "retraction_pubmed_id": retracted_foundational.get("retraction_pubmed_id") if retracted_foundational else None,
+        "retracted": bool(retracted),
+        "original_doi": retracted.get("doi") or None,
+        "retraction_doi": retracted.get("retraction_doi"),
+        "retraction_date": retracted.get("retraction_date"),
+        "retraction_pubmed_id": retracted.get("retraction_pubmed_id"),
     }
 
-    papers = _store().papers_for_effect(effect_id)
-    wikis  = _store().wikis_for_effect(effect_id) 
-    foundational = [p for p in papers if p.get("classification") == "foundational"]
-    retracted_foundational = next((p for p in foundational if p.get("retracted")), None)
-
-    # Combine papers and wikis, sort by year (or wiki_year for wikis)
-    combined = []
-    for p in papers:
-        p_copy = p.copy()
-        p_copy["_type"] = "paper"
-        combined.append(p_copy)
-    
-    for w in wikis:
-        if (w.get("validation") or "").strip().lower() == "non-related":
-            continue
-        w_copy = w.copy()
-        w_copy["_type"] = "wiki"
-        combined.append(w_copy)
-    
-    # Sort by year descending (newest first)
-    combined.sort(key=lambda x: x.get("year") or 0, reverse=False)
+    # One timeline of papers and Wikipedia entries, oldest first; undated last.
+    combined = [{**p, "_type": "paper"} for p in papers] + [{**w, "_type": "wiki"} for w in wikis]
+    combined.sort(key=lambda x: (x.get("year") is None, x.get("year") or 0))
 
     return jsonify({**effect, "papers_and_wikis": combined, "foundational_retraction": foundational_retraction, "wikis": wikis})
 
