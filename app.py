@@ -119,19 +119,33 @@ class DataStore:
 
     def search(self, query: str, limit: int = 20) -> dict[str, list[dict]]:
         q = query.lower()
-        effect_results = []
+        # Rank: name starts with the query, then name contains it, then only
+        # the description mentions it. Previously results came in sheet order,
+        # so an exact name match could be cut off by the limit.
+        ranked: list[tuple[int, str, dict]] = []
         for e in self.effects:
-            if q in e["name"].lower() or q in e.get("description", "").lower():
-                effect_results.append({
-                    "id": e["id"],
-                    "name": e["name"],
-                    "field": e.get("field") or "Other",
-                    "discipline": e["discipline"],
-                    "clusters": e.get("clusters", []),
-                    "status": e["status"],
-                })
-                if len(effect_results) >= limit:
-                    break
+            name = e["name"].lower()
+            if name.startswith(q):
+                rank = 0
+            elif q in name:
+                rank = 1
+            elif q in (e.get("description") or "").lower():
+                rank = 2
+            else:
+                continue
+            ranked.append((rank, name, e))
+        ranked.sort(key=lambda t: (t[0], t[1]))
+        effect_results = [
+            {
+                "id": e["id"],
+                "name": e["name"],
+                "field": e.get("field") or "Other",
+                "discipline": e["discipline"],
+                "clusters": e.get("clusters", []),
+                "status": e["status"],
+            }
+            for _, _, e in ranked[:limit]
+        ]
 
         cluster_results: list[dict] = []
         for disc, clusters in self._clusters_by_disc.items():
