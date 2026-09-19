@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
+import time
 from pathlib import Path
 from urllib.request import urlopen
 from datetime import datetime
@@ -56,6 +59,18 @@ def clean_text(value: object) -> str:
     return re.sub(r"[\u200b\u200c\u200d\ufeff]", "", s).strip()
 
 
+RETRACTION_COLUMNS = [
+    "OriginalPaperDOI",
+    "RetractionDOI",
+    "RetractionDate",
+    "RetractionPubMedID",
+    "RetractionNature",
+]
+RETRACTIONS_MAX_AGE_DAYS = 7
+DEFAULT_RETRACTIONS_CSV = "data/retraction_watch.csv"
+# Placeholders used in both sources where no DOI exists; never match on these.
+NON_DOI_VALUES = {"", "unavailable", "not available", "nan", "none", "n/a", "0"}
+
 def make_id(name):
     # No length cap: truncating made distinct long effect names share one id.
     slug = re.sub(r'[^a-z0-9]+', '_', clean_text(name).lower())
@@ -97,11 +112,46 @@ def format_retraction_date(value: object) -> str | None:
 
     return f"{dt.day} {dt.strftime('%B %Y')}"
 
-def download_retractions_csv(url: str, dest_path: Path) -> Path:
+def download_retractions_csv(
+    url: str,
+    dest_path: Path,
+    max_age_days: float = RETRACTIONS_MAX_AGE_DAYS,
+    force: bool = False,
+) -> Path:
+    """Make sure a recent, slimmed-down copy of the Retraction Watch CSV exists.
+
+    The upstream file is ~65 MB with 20 columns; we need five. The cached copy
+    keeps only those (~5 MB) and is reused until it is older than
+    ``max_age_days``. If a refresh fails, a stale cache is used with a warning;
+    with no cache at all the error propagates so a build fails loudly rather
+    than publishing data without retraction flags.
+    """
     dest_path.parent.mkdir(parents=True, exist_ok=True)
-    with urlopen(url, timeout=30) as resp:
-        data = resp.read()
-    dest_path.write_bytes(data)
+    if dest_path.exists() and not force:
+        age_days = (time.time() - dest_path.stat().st_mtime) / 86400
+        if age_days < max_age_days:
+            print(f"Using cached Retraction Watch data ({age_days:.1f} days old): {dest_path}")
+            return dest_path
+
+    tmp_raw = dest_path.with_name(dest_path.name + ".download")
+    tmp_slim = dest_path.with_name(dest_path.name + ".tmp")
+    try:
+        print("Downloading Retraction Watch data...")
+        with urlopen(url, timeout=60) as resp, open(tmp_raw, "wb") as fh:
+            shutil.copyfileobj(resp, fh)
+        slim = pd.read_csv(tmp_raw, dtype=str, usecols=lambda c: c in RETRACTION_COLUMNS)
+        missing = set(RETRACTION_COLUMNS) - set(slim.columns)
+        if missing:
+            raise ValueError(f"Missing required columns in retractions CSV: {sorted(missing)}")
+        slim.to_csv(tmp_slim, index=False)
+        os.replace(tmp_slim, dest_path)  # atomic: never leaves a half-written cache
+    except (OSError, ValueError, pd.errors.ParserError) as exc:
+        if not dest_path.exists():
+            raise
+        print(f"WARNING: could not refresh Retraction Watch data ({exc}); using stale cache {dest_path}")
+    finally:
+        tmp_raw.unlink(missing_ok=True)
+        tmp_slim.unlink(missing_ok=True)
     return dest_path
 
 def normalize_doi(value: object) -> str:
@@ -109,7 +159,7 @@ def normalize_doi(value: object) -> str:
         return ""
     doi = str(value).strip().lower()
     doi = re.sub(r"^https?://(dx\.)?doi\.org/", "", doi)
-    return doi
+    return "" if doi in NON_DOI_VALUES else doi
 
 def clean_optional(value: object) -> str | None:
     if pd.isna(value):
@@ -119,50 +169,58 @@ def clean_optional(value: object) -> str | None:
         return None
     return s
 
-def load_retractions_index(csv_path: Path) -> dict[str, dict]:
-    df = pd.read_csv(csv_path, dtype=str, keep_default_na=True)
+def load_retractions_index(csv_path: Path, wanted_dois: set[str] | None = None) -> dict[str, dict]:
+    """Index retractions by normalised original-paper DOI.
 
-    expected = {
-        "OriginalPaperDOI",
-        "RetractionDOI",
-        "RetractionDate",
-        "RetractionPubMedID",
-    }
-    missing = expected - set(df.columns)
+    ``wanted_dois`` limits the index to the DOIs we actually cite, so only a
+    handful of rows need per-row work instead of all ~70k.
+    """
+    df = pd.read_csv(csv_path, dtype=str, usecols=lambda c: c in RETRACTION_COLUMNS)
+    missing = set(RETRACTION_COLUMNS) - set(df.columns)
     if missing:
         raise ValueError(f"Missing required columns in retractions CSV: {sorted(missing)}")
 
+    df["_doi"] = (
+        df["OriginalPaperDOI"].fillna("").str.strip().str.lower()
+        .str.replace(r"^https?://(dx\.)?doi\.org/", "", regex=True)
+    )
+    df = df[~df["_doi"].isin(NON_DOI_VALUES)]
+    if wanted_dois is not None:
+        df = df[df["_doi"].isin(wanted_dois)]
+
     # The dataset also lists corrections, expressions of concern and
     # reinstatements. Only a retraction that was not later reinstated counts.
-    if "RetractionNature" in df.columns:
-        nature = df["RetractionNature"].fillna("").str.strip().str.lower()
-        reinstated = set(df.loc[nature == "reinstatement", "OriginalPaperDOI"].map(normalize_doi))
-        df = df[nature == "retraction"]
-        df = df[~df["OriginalPaperDOI"].map(normalize_doi).isin(reinstated - {""})]
+    nature = df["RetractionNature"].fillna("").str.strip().str.lower()
+    reinstated = set(df.loc[nature == "reinstatement", "_doi"])
+    df = df[(nature == "retraction") & ~df["_doi"].isin(reinstated)]
 
-    idx: dict[str, dict] = {}
-    for _, row in df.iterrows():
-        original_doi = normalize_doi(row.get("OriginalPaperDOI"))
-        if not original_doi:
-            continue
+    # Keep the first record per DOI
+    df = df.drop_duplicates("_doi", keep="first")
+    return {
+        row["_doi"]: {
+            "retracted": True,
+            "retraction_doi": clean_optional(row["RetractionDOI"]),
+            "retraction_date": format_retraction_date(row["RetractionDate"]),
+            "retraction_pubmed_id": clean_optional(row["RetractionPubMedID"]),
+        }
+        for _, row in df.iterrows()
+    }
 
-        # Keep first record per DOI (or adjust policy if you prefer latest date)
-        if original_doi not in idx:
-            idx[original_doi] = {
-                "retracted": True,
-                "retraction_doi": clean_optional(row.get("RetractionDOI")),
-                "retraction_date": format_retraction_date(row.get("RetractionDate")),
-                "retraction_pubmed_id": clean_optional(row.get("RetractionPubMedID")),
-            }
-
-    return idx
-
-def run(xlsx_path: str, retractions_csv_path: str = "data/retractions.csv"):
-    csv_path = download_retractions_csv(RETRACTIONS_CSV_URL, Path(retractions_csv_path))
-    retractions_index = load_retractions_index(csv_path)
+def run(
+    xlsx_path: str,
+    retractions_csv_path: str = DEFAULT_RETRACTIONS_CSV,
+    max_age_days: float = RETRACTIONS_MAX_AGE_DAYS,
+    refresh_retractions: bool = False,
+):
+    csv_path = download_retractions_csv(
+        RETRACTIONS_CSV_URL, Path(retractions_csv_path),
+        max_age_days=max_age_days, force=refresh_retractions,
+    )
     xl = pd.ExcelFile(xlsx_path)
     effects_df = pd.read_excel(xl, 'effects_review')
     papers_df  = pd.read_excel(xl, 'papers_review')
+    cited_dois = {normalize_doi(d) for d in papers_df.get('doi', [])} - {""}
+    retractions_index = load_retractions_index(csv_path, cited_dois)
     effects_wikipaedia_df = pd.read_excel(xl, 'effects_wikipedia')
 
     effects = []
@@ -252,11 +310,22 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--retractions-csv",
-        default="data/retraction_watch.csv",
-        help="Local cache path for downloaded Retraction Watch CSV",
+        default=DEFAULT_RETRACTIONS_CSV,
+        help="Local cache path for the slimmed-down Retraction Watch CSV",
+    )
+    parser.add_argument(
+        "--retractions-max-age-days",
+        type=float,
+        default=RETRACTIONS_MAX_AGE_DAYS,
+        help=f"Re-download the Retraction Watch data once the cache is older than this (default: {RETRACTIONS_MAX_AGE_DAYS})",
+    )
+    parser.add_argument(
+        "--refresh-retractions",
+        action="store_true",
+        help="Ignore the cache and download the Retraction Watch data now",
     )
     args = parser.parse_args(argv)
-    run(args.xlsx, args.retractions_csv)
+    run(args.xlsx, args.retractions_csv, args.retractions_max_age_days, args.refresh_retractions)
 
 
 if __name__ == "__main__":
