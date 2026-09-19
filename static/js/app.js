@@ -93,8 +93,10 @@ const safeUrl = v => (/^https?:\/\//i.test(String(v ?? '').trim()) ? String(v).t
 // ── API ────────────────────────────────────────────────────────────────────
 async function api(path) {
   const r = await fetch(path);
+  if (!r.ok) throw new Error(`Request failed (${r.status}): ${path}`);
   return r.json();
 }
+const LOAD_ERROR = 'Could not load data. Check your connection and try again.';
 
 // ── BREADCRUMB ─────────────────────────────────────────────────────────────
 function setBc() {
@@ -301,6 +303,15 @@ async function render() {
   });
   liveNodes.clear();
 
+  try {
+    await renderLevel(seq);
+  } catch (err) {
+    console.error(err);
+    if (!isStale(seq)) hint.textContent = LOAD_ERROR;
+  }
+}
+
+async function renderLevel(seq) {
   if (state.level === 0) {
     hint.textContent = 'Click a field to explore disciplines';
     await renderFields(seq);
@@ -542,8 +553,18 @@ const STATUS_BG = {
   replicated:'#2d9b5c22', not_replicated:'#e05c3022', reversed:'#99355622', mixed:'#c49a0022', unknown:'#88878022'
 };
 
+let openEffectSeq = 0;
 async function openEffect(effectId) {
-  const data = await api(`/api/effect/${encodeURIComponent(effectId)}`);
+  const seq = ++openEffectSeq;
+  let data;
+  try {
+    data = await api(`/api/effect/${encodeURIComponent(effectId)}`);
+  } catch (err) {
+    console.error(err);
+    if (seq === openEffectSeq) hint.textContent = LOAD_ERROR;
+    return;
+  }
+  if (seq !== openEffectSeq) return;  // a later click won; don't overwrite its panel
   tlTitle.textContent = data.name;
   tlDesc.textContent = data.description || '';
   // const sc = STATUS_COLORS[data.status] || STATUS_COLORS.unknown;
@@ -670,6 +691,7 @@ document.getElementById('tl-close').addEventListener('click', closeTimeline);
 const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 let searchTimeout;
+let searchSeq = 0;
 
 function colorForTag(name) {
   let hash = 0;
@@ -696,9 +718,20 @@ function openClusterFromSearch(clusterName, disciplineName, fieldName) {
 searchInput.addEventListener('input', () => {
   clearTimeout(searchTimeout);
   const q = searchInput.value.trim();
+  const seq = ++searchSeq;
   if (q.length < 2) { searchResults.classList.remove('open'); return; }
   searchTimeout = setTimeout(async () => {
-    const payload = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    let payload;
+    try {
+      payload = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    } catch (err) {
+      console.error(err);
+      if (seq !== searchSeq) return;
+      searchResults.innerHTML = '<div class="sr-item" style="color:var(--text3)">Search is unavailable right now</div>';
+      searchResults.classList.add('open');
+      return;
+    }
+    if (seq !== searchSeq) return;  // a newer query is in flight; drop this answer
     const effects = payload.effects || [];
     const clusters = payload.clusters || [];
     searchResults.innerHTML = '';
@@ -764,6 +797,21 @@ searchInput.addEventListener('input', () => {
 
 document.addEventListener('click', e => {
   if (!e.target.closest('#search-wrap')) searchResults.classList.remove('open');
+});
+
+// Enter opens the first result
+searchInput.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !searchResults.classList.contains('open')) return;
+  const first = searchResults.querySelector('.sr-tag, .sr-item-name');
+  if (first) { e.preventDefault(); first.click(); }
+});
+
+// Escape closes the topmost thing: tour, then search results, then evidence panel
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (tourState) destroyTour(true);
+  else if (searchResults.classList.contains('open')) { searchResults.classList.remove('open'); searchInput.blur(); }
+  else if (tlPanel.classList.contains('open')) closeTimeline();
 });
 
 // ── ONBOARDING TOUR ───────────────────────────────────────────────────────
