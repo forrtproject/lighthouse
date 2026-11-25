@@ -1,38 +1,70 @@
+/* About page: a normal scrolling document, unlike the fixed-height map. */
 body { overflow: auto; }
-#header { position: sticky; top: 0; z-index: 20; }
+#app { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; height: auto; }
+#header { position: sticky; top: 0; }
+#header-right { margin-left: auto; }
 
 #about-main {
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 48px 24px 80px;
+  flex: 1 0 auto; width: 100%; max-width: 760px;
+  margin: 0 auto; padding: var(--spacing-10) var(--spacing-4) var(--spacing-16);
+}
+
+#about-content {
+  padding: var(--spacing-10) var(--spacing-10) var(--spacing-8);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 #about-content h1 {
-  font-size: 22px; font-weight: 700; color: var(--text);
-  margin-bottom: 24px;
+  font-family: var(--font-display); font-size: var(--text-3xl);
+  font-weight: var(--font-weight-bold); line-height: var(--leading-tight);
+  color: var(--color-primary); margin-bottom: var(--spacing-6);
 }
 
 #about-content h2 {
-  font-size: 14px; font-weight: 600; color: var(--text);
-  margin: 36px 0 10px;
-  padding-bottom: 6px;
-  border-bottom: 0.5px solid var(--border);
+  font-family: var(--font-display); font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold); color: var(--color-text);
+  margin: var(--spacing-10) 0 var(--spacing-3);
+  padding-bottom: var(--spacing-2);
+  border-bottom: 1px solid var(--color-border-light);
+  scroll-margin-top: 72px;   /* clears the sticky bar when reached by #anchor */
 }
+#about-content h2:target { color: var(--color-primary); }
 
-#about-content p {
-  font-size: 13px; color: var(--text2); line-height: 1.7;
-  margin-bottom: 12px;
+#about-content p,
+#about-content ul, #about-content ol {
+  font-size: var(--text-lg); line-height: var(--leading-loose);
+  color: var(--color-text-secondary); margin-bottom: var(--spacing-4);
 }
+#about-content ul, #about-content ol { padding-left: var(--spacing-6); }
+#about-content li { margin-bottom: var(--spacing-1); }
+#about-content li::marker { color: var(--color-primary); }
 
 #about-content a {
-  color: var(--accent); text-decoration: none;
+  color: var(--color-primary); text-decoration: underline;
+  text-decoration-color: var(--color-primary-border); text-underline-offset: 2px;
+  overflow-wrap: anywhere;
 }
-#about-content a:hover { text-decoration: underline; }
+#about-content a:hover { text-decoration-color: currentColor; }
 
-#about-content ul, #about-content ol {
-  font-size: 13px; color: var(--text2); line-height: 1.7;
-  padding-left: 20px; margin-bottom: 12px;
+#about-content blockquote {
+  margin: var(--spacing-4) 0;
+  padding: var(--spacing-4) var(--spacing-5);
+  background: var(--color-surface-subtle);
+  border-left: var(--border-width-accent) solid var(--color-primary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+#about-content blockquote p {
+  margin: 0; font-family: var(--font-display); font-style: italic;
+  font-size: var(--text-md); color: var(--color-text);
 }
 
-/* The about page scrolls as a normal document, unlike the fixed-height map. */
-#app { display: block; height: auto; }
+@media (max-width: 600px) {
+  #about-main { padding: var(--spacing-5) var(--spacing-3) var(--spacing-10); }
+  #about-content { padding: var(--spacing-6) var(--spacing-5); }
+  #about-content h1 { font-size: var(--text-2xl); }
+  #about-content p, #about-content ul, #about-content ol { font-size: var(--text-md); }
+  #footer { display: flex; }
+}

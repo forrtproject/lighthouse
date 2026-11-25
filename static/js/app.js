@@ -40,12 +40,13 @@ const STATUS_COLORS = {
   reversed:'#993556', unknown:'#888780'
 };
 const TYPE_CONF = {
-  foundational: { c:'#185FA5', label:'Foundational', shape:'■' },
-  critique:     { c:'#0F6E56', label:'Critique', shape:'●' },
-  meta_analysis:{ c:'#534AB7', label:'Meta-analysis', shape:'■' },
-  replication:  { c:'#3B6D11', label:'Replication', shape:'◆' },
-  reproduction: { c:'#854F0B', label:'Reproduction', shape:'▲' },
-  other:        { c:'#888780', label:'Other', shape:'○' },
+  // Colours are CSS variables (style.css) so they hold contrast in both themes.
+  foundational: { c:'var(--type-foundational)', label:'Foundational', shape:'■' },
+  critique:     { c:'var(--type-critique)', label:'Critique', shape:'●' },
+  meta_analysis:{ c:'var(--type-meta)', label:'Meta-analysis', shape:'■' },
+  replication:  { c:'var(--type-replication)', label:'Replication', shape:'◆' },
+  reproduction: { c:'var(--type-reproduction)', label:'Reproduction', shape:'▲' },
+  other:        { c:'var(--type-other)', label:'Other', shape:'○' },
 };
 
 // ── STATE ──────────────────────────────────────────────────────────────────
@@ -113,13 +114,16 @@ function setBc() {
   bc.innerHTML = '';
   parts.forEach((p, i) => {
     const last = i === parts.length - 1;
-    const s = document.createElement('span');
+    // Earlier crumbs are buttons so they work from the keyboard too.
+    const s = document.createElement(last ? 'span' : 'button');
     s.textContent = p.txt; s.className = 'crumb' + (last ? ' active' : '');
-    if (!last) s.addEventListener('click', p.action);
+    s.title = p.txt;
+    if (last) s.setAttribute('aria-current', 'location');
+    else { s.type = 'button'; s.addEventListener('click', p.action); }
     bc.appendChild(s);
-    if (!last) { const sep = document.createElement('span'); sep.className='sep'; sep.textContent='›'; bc.appendChild(sep); }
+    if (!last) { const sep = document.createElement('span'); sep.className='sep'; sep.setAttribute('aria-hidden','true'); sep.textContent='›'; bc.appendChild(sep); }
   });
-  backBtn.style.display = state.level > 0 ? 'block' : 'none';
+  backBtn.style.display = state.level > 0 ? 'inline-flex' : 'none';
 }
 
 function jumpTo(lvl) {
@@ -140,28 +144,45 @@ function makeSvgEl(tag, attrs) {
   return el;
 }
 
-function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick, boxWidth, boxHeight }) {
+// Width of a box that fits `chars` characters at font size `fs`.
+const boxW = (chars, fs) => Math.ceil(chars * fs * 0.62 + 22);
+const longest = names => names.reduce((m, s) => Math.max(m, s.length), 0);
+
+let clipSeq = 0;
+function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick, boxWidth, boxHeight, label }) {
   const g = document.createElementNS(NS, 'g');
-  g.setAttribute('class', 'lh-node' + (kind==='anchor'?' lh-anchor':''));
+  g.setAttribute('class', 'lh-node' + (kind==='anchor' ? ' lh-anchor' : kind==='hub' ? ' lh-hub' : '') + (fs <= 11 ? ' lh-small' : ''));
   g.setAttribute('transform', `translate(${x},${y})`);
+  // Colour is read by CSS, so theme changes recolour nodes without a redraw.
+  g.style.setProperty('--node-c', color);
 
-  const dark = darkMode;
-  const fillColor = dark ? hexAlpha(color, 0.35) : hexAlpha(color, 0.18);
-  const strokeColor = color;
-
-  // Rounded rectangle: width driven by longest label line, height by r
+  // Card: width driven by the longest label line unless given, height by r.
   const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, '');
-  const rw = boxWidth || Math.max(r * 2, longestLine.length * fs * 0.62 + 14);
+  const rw = boxWidth || Math.max(r * 2, longestLine.length * fs * 0.62 + 22);
   const rh = boxHeight || r * 2;
-  const cornerR = Math.round(r * 0.35);
+  const cornerR = Math.min(8, rh / 2);
 
+  // Everything lives in .nbody so the spawn animation can scale it as one.
+  const body = makeSvgEl('g', { class:'nbody' });
+  g.appendChild(body);
+  body.appendChild(makeSvgEl('rect', {
+    class:'nshadow', x:-rw/2, y:-rh/2 + 1.5, width:rw, height:rh, rx:cornerR,
+  }));
   const rect = makeSvgEl('rect', {
     class:'nbg', x:-rw/2, y:-rh/2, width:rw, height:rh, rx:cornerR,
-    fill: fillColor, stroke: strokeColor,
-    'stroke-width': kind==='anchor' ? '1.2' : '1.5',
-    'fill-opacity': kind==='anchor' ? '0.6' : '1',
   });
-  g.appendChild(rect);
+  body.appendChild(rect);
+
+  // Category rail on the left edge of ordinary cards, clipped to the card's corners.
+  if (kind === 'normal') {
+    const clipId = `lhclip${++clipSeq}`;
+    const clip = makeSvgEl('clipPath', { id: clipId });
+    clip.appendChild(makeSvgEl('rect', { x:-rw/2, y:-rh/2, width:rw, height:rh, rx:cornerR }));
+    body.appendChild(clip);
+    body.appendChild(makeSvgEl('rect', {
+      class:'nrail', x:-rw/2, y:-rh/2, width:4, height:rh, 'clip-path':`url(#${clipId})`,
+    }));
+  }
 
   // // Status ring (outer rounded rect)
   // if (statusColor && kind !== 'anchor') {
@@ -178,17 +199,23 @@ function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick, bo
   const startY = -((lines.length - 1) * lh) / 2;
   const txt = makeSvgEl('text', {
     class:'nlabel', 'text-anchor':'middle', 'dominant-baseline':'central',
-    fill: dark ? '#e0ddd5' : (kind==='anchor' ? hexAlpha(color,0.7) : color),
-    'font-size': fs, 'font-weight': kind==='anchor' ? '400' : '500',
+    'font-size': fs,
   });
   lines.forEach((line, i) => {
-    const tspan = makeSvgEl('tspan', { x: '0', y: startY + i * lh });
+    const tspan = makeSvgEl('tspan', { x: kind === 'normal' ? '2' : '0', y: startY + i * lh });
     tspan.textContent = line;
     txt.appendChild(tspan);
   });
-  g.appendChild(txt);
+  body.appendChild(txt);
 
   if (onClick) {
+    // Reachable and operable from the keyboard as well as by pointer.
+    g.setAttribute('tabindex', '0');
+    g.setAttribute('role', 'button');
+    g.setAttribute('aria-label', label || lines.join(' '));
+    g.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+    });
     g.addEventListener('click', onClick);
     // Treat a touch as a tap only if the finger barely moved, so dragging to
     // scroll a long list does not open whatever node the finger started on.
@@ -208,17 +235,35 @@ function makeNode({ id, x, y, r, color, lines, fs=12, kind='normal', onClick, bo
 }
 
 function makeEdge(x1, y1, x2, y2, color, delay=0) {
-  const line = makeSvgEl('line', {
-    class:'lh-edge', x1, y1, x2, y2,
-    stroke: color, 'stroke-width':'1',
+  // Children laid out to the right of their anchor get a smooth S-curve
+  // (a tidy fan instead of crossing straight lines); the radial top level
+  // keeps straight spokes.
+  const dx = x2 - x1;
+  const d = dx > 60
+    ? `M${x1},${y1} C${x1 + dx * 0.5},${y1} ${x2 - dx * 0.5},${y2} ${x2},${y2}`
+    : `M${x1},${y1} L${x2},${y2}`;
+  const path = makeSvgEl('path', {
+    class:'lh-edge', d, 'stroke-width':'1.25',
     'stroke-opacity':'0', 'stroke-linecap':'round',
   });
-  svg.insertBefore(line, svg.firstChild);
-  setTimeout(() => {
-    line.style.transition = 'stroke-opacity .35s ease, x2 .5s ease, y2 .5s ease';
-    line.setAttribute('stroke-opacity', '0.22');
-  }, delay);
-  return line;
+  svg.insertBefore(path, svg.firstChild);
+  setTimeout(() => path.setAttribute('stroke-opacity', '0.55'), delay);
+  return path;
+}
+
+// A soft frame behind a multi-column grid, so every card reads as part of
+// the anchor's group without drawing a line through the column gaps.
+function makeGroupFrame(boxes, pad = 14) {
+  if (!boxes.length) return null;
+  const x0 = Math.min(...boxes.map(b => b.x - b.w / 2)) - pad;
+  const x1 = Math.max(...boxes.map(b => b.x + b.w / 2)) + pad;
+  const y0 = Math.min(...boxes.map(b => b.y - b.h / 2)) - pad;
+  const y1 = Math.max(...boxes.map(b => b.y + b.h / 2)) + pad;
+  const frame = makeSvgEl('rect', {
+    class:'lh-edge lh-group', x:x0, y:y0, width:x1 - x0, height:y1 - y0, rx:12,
+  });
+  svg.insertBefore(frame, svg.firstChild);
+  return frame;
 }
 
 // ── ANIMATION ──────────────────────────────────────────────────────────────
@@ -255,8 +300,9 @@ function tyCur(el) {
 // ── CLEAR / TRANSITION ─────────────────────────────────────────────────────
 function clearEdges() {
   svg.querySelectorAll('.lh-edge').forEach(e => {
-    e.style.transition = 'stroke-opacity .2s';
+    e.style.transition = 'stroke-opacity .2s, opacity .2s';
     e.setAttribute('stroke-opacity','0');
+    e.style.opacity = '0';
     setTimeout(() => e.parentNode?.removeChild(e), 220);
   });
 }
@@ -269,8 +315,8 @@ function spawnNode(nodeEl, fromX, fromY, toX, toY, toR, delay) {
     nodeEl.style.transition = 'opacity .25s';
     nodeEl.style.opacity = '1';
     animate(nodeEl, { tx:[fromX,toX], ty:[fromY,toY] }, 540, 0);
-    // Scale shape from tiny to full size
-    const c = nodeEl.querySelector('.nbg');
+    // Scale the card from tiny to full size
+    const c = nodeEl.querySelector('.nbody');
     if (c) {
       const ease = t => t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
       const s = performance.now();
@@ -321,7 +367,7 @@ function later(seq, fn, ms) {
 async function render() {
   const seq = ++renderSeq;
   scroller.scrollTop = 0;
-  resize(); setBc(); clearEdges(); updateScrollCue();
+  resize(); setBc(); clearEdges(); updateScrollCue(); syncUrl();
 
   // Remove non-anchor nodes with fade
   liveNodes.forEach((n, id) => {
@@ -373,7 +419,8 @@ async function renderFields(seq) {
 
   const hub = makeNode({
     id:'__hub__', x:cx, y:cy, r:25,
-    color:HUB_COLOR, lines:['All', 'Disciplines'], fs:portrait ? 14 : 20, kind:'hub',
+    color:HUB_COLOR, lines:['All', 'Disciplines'], fs:portrait ? 14 : 17, kind:'hub',
+    boxWidth: portrait ? 110 : 150, boxHeight: portrait ? 56 : 68,
     onClick:() => jumpTo(0),
   });
   hub.setAttribute('transform', `translate(${cx},${cy})`);
@@ -389,7 +436,8 @@ async function renderFields(seq) {
     const r = portrait ? (VH < 520 ? 22 : 30) : Math.min(54, Math.max(40, 680/names.length));
     const node = makeNode({
       id:'field_'+i, x:tx, y:ty, r,
-      color, lines:wrap(name, 12), fs:11,
+      color, lines:wrap(name, 12), fs: portrait ? 12 : 13,
+      boxWidth: portrait ? 112 : 156, boxHeight: portrait ? (VH < 520 ? 44 : 52) : 60,
       onClick:() => { state.field=name; state.level=1; render(); },
     });
     spawnNode(node, cx, cy, tx, ty, r, 60+i*35);
@@ -403,14 +451,20 @@ async function renderDiscs(seq) {
   const allDiscs = await api('/api/disciplines');
   if (isStale(seq)) return;
   const discs = allDiscs.filter(d => d.field === state.field);
-  const cx = Math.max(VW*0.32, 190), cy = VH/2;   // 190 keeps clear of the anchor on phones
-  const anchorX = 70, anchorY = cy;
+  const anchorX = 70, anchorY = VH/2;
+  // One width for every discipline card; narrower on phones so the
+  // zig-zag column stays clear of the anchor and the right edge.
+  const discFs = 13;
+  const discW = Math.max(110, Math.min(boxW(Math.min(22, longest(discs.map(d => d.name))), discFs), VW - 210));
+  const discWrap = Math.max(8, Math.floor((discW - 22) / (discFs * 0.62)));
+  const cx = Math.max(VW*0.32, 135 + discW/2), cy = VH/2;
 
   // Field anchor on left
   const color = getDiscColor(state.field);
   const anchor = makeNode({
     id:'__field__', x:anchorX, y:anchorY, r:36,
-    color, lines:wrap(state.field,10), fs:10, kind:'anchor',
+    color, lines:wrap(state.field,10), fs:12, kind:'anchor',
+    boxWidth:110, boxHeight:56,
     onClick:()=>jumpTo(0),
   });
   anchor.setAttribute('transform', `translate(${anchorX},${anchorY})`);
@@ -419,7 +473,7 @@ async function renderDiscs(seq) {
   liveNodes.set('__field__', { el:anchor, x:anchorX, y:anchorY, r:36, color, kind:'anchor' });
 
   const n = discs.length;
-  const discSpacing = 92;                        // node height 84 + gap
+  const discSpacing = 70;                        // node height 56 + gap
   const discFits = n * discSpacing <= VH - 24;
   if (!discFits) setSvgHeight(n * discSpacing + 24);
   const spread = (n - 1) * (discFits ? Math.min(discSpacing, (VH * 0.82) / Math.max(n - 1, 1)) : discSpacing);
@@ -429,10 +483,11 @@ async function renderDiscs(seq) {
     const tx = cx + (i%2===0 ? 0 : 55);
     const ty = n===1 ? cy : startY + (i/(n-1))*spread;
     const dc = getDiscColor(d.name);
-    const r = 42;
+    const r = 28;
     const node = makeNode({
       id:'disc_'+i, x:tx, y:ty, r,
-      color:dc, lines:wrap(d.name,12), fs:11,
+      color:dc, lines:wrap(d.name, discWrap), fs:discFs,
+      boxWidth:discW, boxHeight:56,
       onClick:()=>{ state.disc=d.name; state.sub=d.name; state.level=2; render(); },
     });
     spawnNode(node, anchorX, anchorY, tx, ty, r, 80+i*40);
@@ -452,7 +507,8 @@ async function renderClusters(seq) {
   const color = getDiscColor(state.disc);
   const anchor = makeNode({
     id:'__disc__', x:anchorX, y:anchorY, r:36,
-    color, lines:wrap(state.disc,10), fs:10, kind:'anchor',
+    color, lines:wrap(state.disc,12), fs:12, kind:'anchor',
+    boxWidth:110, boxHeight:64,
     onClick:()=>jumpTo(1),
   });
   anchor.setAttribute('transform', `translate(${anchorX},${anchorY})`);
@@ -463,13 +519,15 @@ async function renderClusters(seq) {
   const n = clusters.length;
   const rightEdge = mapRightEdge();
   const leftEdge = anchorX + 95;
-  const nodeFs = n > 20 ? 9 : 10;
-  const wrapCh = n > 20 ? 11 : 13;
-  const baseR = n > 20 ? 26 : n > 12 ? 28 : 30;
+  const nodeFs = n > 20 ? 11 : 12;
+  const wrapCh = n > 20 ? 15 : 17;
+  const baseR = n > 20 ? 21 : n > 12 ? 23 : 25;
   const rowSpacing = baseR * 2 + 12;
+  // One card width for the whole level so the grid lines up.
+  const clusterBoxW = boxW(wrapCh, nodeFs);
   // Same rule as the effects view: only as many rows and columns as fit,
   // then scroll.
-  const clusterColW = wrapCh * nodeFs * 0.62 + 14 + 12;
+  const clusterColW = clusterBoxW + 16;
   const maxRows = Math.max(1, Math.floor((VH - 24) / rowSpacing));
   const maxCols = Math.max(1, Math.floor((rightEdge - leftEdge) / clusterColW));
   const preferredCols = n > 20 ? 4 : n > 12 ? 3 : n > 6 ? 2 : 1;
@@ -479,25 +537,32 @@ async function renderClusters(seq) {
   if (!clusterFits) setSvgHeight(perCol * rowSpacing + 24);
   const spread = clusterFits ? Math.min(VH * 0.85, perCol * rowSpacing) : (perCol - 1) * rowSpacing;
   const startY = clusterFits ? VH / 2 - spread / 2 : 12 + rowSpacing / 2;
-  const colW = (rightEdge - leftEdge) / numCols;
-  const startX = leftEdge + colW / 2;
+  // Columns sit at a comfortable gap and the block is centred in the free
+  // space, rather than stretched to the screen edges.
+  const colW = Math.min((rightEdge - leftEdge) / numCols, clusterColW + 90);
+  const startX = leftEdge + ((rightEdge - leftEdge) - colW * numCols) / 2 + colW / 2;
 
-  clusters.forEach((c, i) => {
+  const pos = clusters.map((c, i) => {
     const col = Math.floor(i / perCol);
     const row = i % perCol;
-    const tx = startX + col * colW;
-    const ty = perCol === 1 ? cy : startY + (row / (perCol - 1 || 1)) * spread;
+    return { col, x: startX + col * colW, y: perCol === 1 ? cy : startY + (row / (perCol - 1 || 1)) * spread, w: clusterBoxW, h: baseR * 2 };
+  });
+  if (numCols > 1) makeGroupFrame(pos);
+
+  clusters.forEach((c, i) => {
+    const { col, x: tx, y: ty } = pos[i];
     const cc = getDiscColor(c.name); // use cluster name for consistent coloring
     const r = baseR;
     const node = makeNode({
       id:'clust_'+i, x:tx, y:ty, r,
       color:cc, lines:wrap(c.name, wrapCh), fs:nodeFs,
+      boxWidth:clusterBoxW, boxHeight:baseR * 2,
       onClick:()=>{ state.cluster=c.name; state.level=3; render(); },
     });
     const delayStep = Math.max(6, Math.min(18, Math.floor(650 / (n || 1))));
     spawnNode(node, anchorX, anchorY, tx, ty, r, 80 + i * delayStep);
     liveNodes.set('clust_'+i, { el:node, x:tx, y:ty, r, color:cc });
-    later(seq, () => makeEdge(anchorX, anchorY, tx, ty, cc, 0), 110 + i * delayStep);
+    if (col === 0) later(seq, () => makeEdge(anchorX + 55, anchorY, tx - clusterBoxW / 2, ty, cc, 0), 110 + i * delayStep);
   });
 }
 
@@ -510,9 +575,9 @@ async function renderEffectsByCluster(seq) {
 
 function drawEffectsLayout(effects, anchorLabel, seq) {
   const discColor = getDiscColor(state.disc||state.field);
-  const effectFs = 10;
+  const effectFs = 12;
   const effectBoxSample = 'Better-than-average effect';
-  const minBoxW = Math.ceil(effectBoxSample.length * effectFs * 0.62 + 18);
+  const minBoxW = Math.ceil(effectBoxSample.length * effectFs * 0.62 + 22);
   const effectBoxH = 60;
   const effectLineHeight = effectFs + 3;
   const effectMaxLines = Math.max(1, Math.floor((effectBoxH - 10) / effectLineHeight));
@@ -522,7 +587,8 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
   const dAnchorX = 65, dAnchorY = VH/2;
   const dAnchor = makeNode({
     id:'__disc__', x:dAnchorX, y:dAnchorY, r:30,
-    color:discColor, lines:wrap(anchorLabel,10), fs:10, kind:'anchor',
+    color:discColor, lines:wrap(anchorLabel,11), fs:12, kind:'anchor',
+    boxWidth:100, boxHeight:64,
     onClick:()=>jumpTo(state.level-1),
   });
   dAnchor.setAttribute('transform', `translate(${dAnchorX},${dAnchorY})`);
@@ -553,9 +619,10 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
   if (!fits) setSvgHeight(contentH + padY + padBottom);
   const startY = fits ? VH / 2 - (contentH - rowSpacing) / 2 : padY + effectBoxH / 2;
 
-  // Distribute columns evenly across available horizontal space
-  const colW   = (rightEdge - leftEdge) / numCols;
-  const startX = leftEdge + colW / 2;
+  // Distribute columns across the available space, up to a comfortable
+  // gap, and centre the block in what is left.
+  const colW   = Math.min((rightEdge - leftEdge) / numCols, 340);
+  const startX = leftEdge + ((rightEdge - leftEdge) - colW * numCols) / 2 + colW / 2;
 
   // Let boxes grow into spare column width so fewer names get cut off.
   const effectBoxW   = Math.max(minBoxW, Math.min(300, Math.floor(colW - 24)));
@@ -563,6 +630,12 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
 
   // Stagger spawn so last node appears within ~600 ms regardless of count
   const delayStep = Math.max(4, Math.min(18, Math.floor(600 / (n || 1))));
+
+  if (numCols > 1) makeGroupFrame(effects.map((_, i) => ({
+    x: startX + Math.floor(i / effectsPerCol) * colW,
+    y: startY + (i % effectsPerCol) * rowSpacing,
+    w: effectBoxW, h: effectBoxH,
+  })));
 
   effects.forEach((eff, i) => {
     const col = Math.floor(i / effectsPerCol);
@@ -580,7 +653,7 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
     const node = makeNode({
       id:'eff_'+i, x:tx, y:ty, r:effectR,
       color:discColor, lines, fs:effectFs,
-      boxWidth: effectBoxW, boxHeight: effectBoxH,
+      boxWidth: effectBoxW, boxHeight: effectBoxH, label: eff.name,
       // statusColor:sc,
       onClick:()=>openEffect(eff.id),
     });
@@ -591,7 +664,7 @@ function drawEffectsLayout(effects, anchorLabel, seq) {
     if (eff.id === state.effect) node.classList.add('lh-selected');
     spawnNode(node, dAnchorX, dAnchorY, tx, ty, effectR, 60 + i * delayStep);
     liveNodes.set('eff_'+i, { el:node, x:tx, y:ty, r:effectR, color:discColor });
-    later(seq, () => makeEdge(dAnchorX, dAnchorY, tx, ty, discColor, 0), 80 + i * delayStep);
+    if (col === 0) later(seq, () => makeEdge(dAnchorX + 50, dAnchorY, tx - effectBoxW / 2, ty, discColor, 0), 80 + i * delayStep);
   });
 
   if (n === 0) hint.textContent = 'No effects found for this discipline';
@@ -659,11 +732,11 @@ async function openEffect(effectId) {
         ? `<a class="tl-doi" href="${esc(doiHref(doi))}" target="_blank" rel="noopener">doi:${esc(doi)}</a>`
         : '';
       const apaHtml = p.apa && p.apa !== 'nan' && p.apa !== p.doi
-        ? `<div class="tl-journal" style="margin-top:3px;font-style:normal;font-size:10px;opacity:.7">${esc(p.apa.substring(0,120))}${p.apa.length>120?'…':''}</div>`
+        ? `<div class="tl-journal" style="font-style:normal">${esc(p.apa.substring(0,120))}${p.apa.length>120?'…':''}</div>`
         : '';
   
       row.innerHTML = `
-        <div class="tl-year" style="color:${tc.c};opacity:.8">${esc(p.year ?? '—')}</div>
+        <div class="tl-year" style="color:${tc.c}">${esc(p.year ?? '—')}</div>
         <div class="tl-dot-wrap">
           <div class="tl-dot" style="border-color:${tc.c};color:${tc.c}">${tc.shape}</div>
         </div>
@@ -689,12 +762,12 @@ async function openEffect(effectId) {
         : `<div class="tl-journal">${esc(wikiLinkLabel)}</div>`;
 
       row.innerHTML = `
-        <div class="tl-year" style="color:#7a5c00;opacity:.8">${esc(p.year ?? p.wiki_year ?? '—')}</div>
+        <div class="tl-year" style="color:var(--type-wiki)">${esc(p.year ?? p.wiki_year ?? '—')}</div>
         <div class="tl-dot-wrap">
-          <div class="tl-dot" style="border-color:#7a5c00;color:#7a5c00">W</div>
+          <div class="tl-dot" style="border-color:var(--type-wiki);color:var(--type-wiki)">W</div>
         </div>
         <div class="tl-content">
-          <div class="tl-type" style="color:#7a5c00">Wikipedia</div>
+          <div class="tl-type" style="color:var(--type-wiki)">Wikipedia</div>
           <div class="tl-paper-title">${esc(p.title || 'Untitled wiki entry')}</div>
           ${wikiLinkHtml}
         </div>`;
@@ -744,6 +817,7 @@ async function openEffect(effectId) {
   tlPanel.classList.add('open');
   tlPanel.scrollTop = 0;
   state.effect = effectId;
+  syncUrl();
   svg.querySelectorAll('.lh-selected').forEach(n => n.classList.remove('lh-selected'));
   svg.querySelectorAll('.lh-node').forEach(n => { if (n.dataset.effectId === effectId) n.classList.add('lh-selected'); });
   // The panel covers the right of the map: lay the effects out again beside it.
@@ -772,6 +846,7 @@ function closeTimeline() {
   const wasOpen = tlPanel.classList.contains('open');
   tlPanel.classList.remove('open');
   state.effect = null;
+  syncUrl();
   svg.querySelectorAll('.lh-selected').forEach(n => n.classList.remove('lh-selected'));
   return wasOpen;
 }
@@ -917,7 +992,7 @@ const TOUR_STEPS = [
   },
   {
     title: 'Home and About',
-    body: 'Use Home to reset to the main map and About to read project context and suggest updates.',
+    body: 'Home takes you back to the start page, and About explains the project and how to suggest updates. To reset the map, use "All fields" in the breadcrumb.',
     selector: '#home-link',
     placement: 'bottom',
   },
@@ -1063,17 +1138,33 @@ function startTour(force = false) {
 document.getElementById('tour-btn')?.addEventListener('click', () => startTour(true));
 
 // ── INIT ───────────────────────────────────────────────────────────────────
-function draw() { /* refresh color fills on theme change */
-  liveNodes.forEach(n => {
-    if (!n.el) return;
-    const c = n.el.querySelector('.nbg');
-    if (c && n.color) {
-      c.setAttribute('fill', darkMode ? hexAlpha(n.color,.35) : hexAlpha(n.color,.18));
-    }
-    const t = n.el.querySelector('text');
-    if (t && n.color) t.setAttribute('fill', darkMode ? '#e0ddd5' : (n.kind==='anchor' ? hexAlpha(n.color,0.7) : n.color));
-  });
+// Called on theme change. Node colours now come from CSS variables, so the
+// map recolours itself; kept as the hook for anything that does need a redraw.
+function draw() {}
+
+// ── DEEP LINKS ─────────────────────────────────────────────────────────────
+// /explore?field=…&discipline=…&cluster=…&effect=… opens that view directly
+// (the landing page links in this way). The URL is kept in step with the map
+// via replaceState, so any view can be shared without adding history entries.
+function syncUrl() {
+  const p = new URLSearchParams();
+  if (state.field) p.set('field', state.field);
+  if (state.level >= 2 && state.disc) p.set('discipline', state.disc);
+  if (state.level >= 3 && state.cluster) p.set('cluster', state.cluster);
+  if (state.effect) p.set('effect', state.effect);
+  const qs = p.toString();
+  history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : ''));
 }
 
-render();
+function stateFromUrl() {
+  const p = new URLSearchParams(location.search);
+  const field = p.get('field'), disc = p.get('discipline'), cluster = p.get('cluster');
+  if (field) { state.field = field; state.level = 1; }
+  if (disc)  { state.disc = disc; state.sub = disc; state.level = 2; }
+  if (cluster && disc) { state.cluster = cluster; state.level = 3; }
+  return p.get('effect');
+}
+
+const linkedEffect = stateFromUrl();
+render().then(() => { if (linkedEffect) openEffect(linkedEffect); });
 setTimeout(() => startTour(false), 700);

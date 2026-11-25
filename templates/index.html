@@ -5,68 +5,96 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FORRT Lighthouse</title>
 <link rel="icon" type="image/webp" href="/static/images/icon.webp">
+<link rel="preload" href="/static/fonts/sourcesans3-latin-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/css/fonts.css">
+<link rel="stylesheet" href="/static/css/tokens.css">
 <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+<a class="skip-link" href="#stage">Skip to the map</a>
 <div id="app">
   <header id="header">
     <div id="logo-wrap">
-      <a href="/" class="logo-link">
-        <img src="/static/images/logo.svg" alt="Lighthouse logo" height="30">
+      <a href="/" class="logo-link" aria-label="FORRT Lighthouse home">
+        <img src="/static/images/logo.svg" alt="FORRT" height="24">
+        <span class="logo-divider" aria-hidden="true"></span>
         <span class="logo-text">Lighthouse</span>
       </a>
     </div>
-    <div id="breadcrumb"></div>
-    <div id="header-right">
+
+    <div id="search-wrap">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg>
+      <input id="search-input" type="search" placeholder="Search effects and tags…" aria-label="Search effects and tags" autocomplete="off">
+      <div id="search-results"></div>
+    </div>
+
+    <span id="wip-badge">⚠ Work in progress — data not fully validated</span>
+
+    <nav id="header-right" aria-label="Site">
       <a href="/" id="home-link" class="nav-link">Home</a>
       <a href="/about" id="about-link" class="nav-link">About</a>
       <button id="tour-btn" type="button" class="nav-link nav-link-btn">Tour</button>
-      <span id="wip-badge">⚠ Work in progress — data not fully validated</span>
-      <div id="search-wrap">
-        <input id="search-input" type="search" placeholder="Search effects and tags…" aria-label="Search effects and tags" autocomplete="off">
-        <div id="search-results"></div>
-      </div>
-      <button id="theme-toggle" aria-label="Toggle theme" title="Toggle dark/light mode">
-        <svg id="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="8" y1="1" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15"/><line x1="1" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15" y2="8"/><line x1="3.1" y1="3.1" x2="4.2" y2="4.2"/><line x1="11.8" y1="11.8" x2="12.9" y2="12.9"/><line x1="12.9" y1="3.1" x2="11.8" y2="4.2"/><line x1="4.2" y1="11.8" x2="3.1" y2="12.9"/></g></svg>
-        <svg id="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:none"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" fill="currentColor"/></svg>
+      <button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle dark/light mode">
+        <svg id="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="8" y1="1" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15"/><line x1="1" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15" y2="8"/><line x1="3.1" y1="3.1" x2="4.2" y2="4.2"/><line x1="11.8" y1="11.8" x2="12.9" y2="12.9"/><line x1="12.9" y1="3.1" x2="11.8" y2="4.2"/><line x1="4.2" y1="11.8" x2="3.1" y2="12.9"/></g></svg>
+        <svg id="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:none" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" fill="currentColor"/></svg>
       </button>
-      <button id="back-btn" class="btn-back" style="display:none">← Back</button>
-    </div>
+    </nav>
   </header>
 
-  <div id="legend">
-    <div class="leg-group">
-      <span class="leg-label">Evidence:</span>
-      <span class="leg-item"><span class="leg-dot" style="background:#185FA5"></span>Foundational</span>
-      <span class="leg-item"><span class="leg-dot" style="background:#0F6E56;border-radius:50%"></span>Critique</span>
-      <span class="leg-item"><span class="leg-dot" style="background:#534AB7"></span>Meta-analysis</span>
-      <span class="leg-item"><span class="leg-dot leg-diamond" style="background:#3B6D11"></span>Replication</span>
-      <span class="leg-item"><span class="leg-dot" style="background:#7a5c00;border-radius:50%"></span>Wikipedia article</span>
+  <div id="subbar">
+    <div id="crumbs-wrap">
+      <button id="back-btn" type="button" class="btn-back" style="display:none" aria-label="Go up one level">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <nav id="breadcrumb" aria-label="Breadcrumb"></nav>
     </div>
-    <!-- <div class="leg-group">
-      <span class="leg-label">Status:</span>
-      <span class="leg-item"><span class="leg-dot" style="background:#2d9b5c"></span>Replicated</span>
-      <span class="leg-item"><span class="leg-dot" style="background:#e05c30"></span>Not replicated</span>
-      <span class="leg-item"><span class="leg-dot" style="background:#c49a00"></span>Mixed</span>
-      <span class="leg-item"><span class="leg-dot" style="background:#993556"></span>Reversed</span>
-    </div> -->
+
+    <div id="legend">
+      <div class="leg-group">
+        <span class="leg-label">Evidence</span>
+        <span class="leg-item"><span class="leg-dot" style="background:var(--type-foundational)"></span>Foundational</span>
+        <span class="leg-item"><span class="leg-dot" style="background:var(--type-critique);border-radius:50%"></span>Critique</span>
+        <span class="leg-item"><span class="leg-dot" style="background:var(--type-meta)"></span>Meta-analysis</span>
+        <span class="leg-item"><span class="leg-dot leg-diamond" style="background:var(--type-replication)"></span>Replication</span>
+        <span class="leg-item"><span class="leg-dot" style="background:var(--type-wiki);border-radius:50%"></span>Wikipedia article</span>
+      </div>
+      <!-- <div class="leg-group">
+        <span class="leg-label">Status:</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#2d9b5c"></span>Replicated</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#e05c30"></span>Not replicated</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#c49a00"></span>Mixed</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#993556"></span>Reversed</span>
+      </div> -->
+    </div>
   </div>
 
-  <div id="stage">
-    <div id="net-scroll"><svg id="net-svg"></svg></div>
-    <div id="timeline-panel">
+  <main id="stage" tabindex="-1">
+    <div id="net-scroll"><svg id="net-svg" role="group" aria-label="Lighthouse map"></svg></div>
+    <aside id="timeline-panel" aria-label="Evidence for the selected effect">
       <div id="tl-header">
         <div>
-          <h3 id="tl-title"></h3>
+          <span class="tl-eyebrow">Effect</span>
+          <h2 id="tl-title"></h2>
           <div id="tl-status-badge"></div>
           <p id="tl-desc"></p>
         </div>
-        <button id="tl-close" aria-label="Close">×</button>
+        <button id="tl-close" type="button" aria-label="Close evidence panel">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        </button>
       </div>
       <div id="tl-body"></div>
+    </aside>
+    <div id="hint" role="status">Click a discipline to explore</div>
+  </main>
+
+  <footer id="footer">
+    <span>FORRT · Framework for Open and Reproducible Research Training</span>
+    <div>
+      <a href="/about">About</a>
+      <a href="/about#suggest-a-new-item">Suggest a new item</a>
     </div>
-    <div id="hint">Click a discipline to explore</div>
-  </div>
+  </footer>
 </div>
 
 <script src="/static/js/app.js"></script>

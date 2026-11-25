@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FORRT Lighthouse — how well does a research effect hold up?</title>
+<meta name="description" content="Lighthouse gathers foundational studies, replications, critiques, meta-analyses and Wikipedia coverage for research effects, organised by field and discipline.">
+<link rel="icon" type="image/webp" href="/static/images/icon.webp">
+<link rel="preload" href="/static/fonts/sourcesans3-latin-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/domine-latin-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/css/fonts.css">
+<link rel="stylesheet" href="/static/css/tokens.css">
+<link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/landing.css">
+<script>
+  // Set the theme before first paint so dark-mode visitors don't see a flash.
+  (function () {
+    let t = null; try { t = localStorage.getItem('theme'); } catch (_) {}
+    const dark = t === 'dark' || (t === null && window.matchMedia('(prefers-color-scheme:dark)').matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  })();
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="app">
+  <header id="header">
+    <div id="logo-wrap">
+      <a href="/" class="logo-link" aria-label="FORRT Lighthouse home" aria-current="page">
+        <img src="/static/images/logo.svg" alt="FORRT" height="24">
+        <span class="logo-divider" aria-hidden="true"></span>
+        <span class="logo-text">Lighthouse</span>
+      </a>
+    </div>
+    <nav id="header-right" aria-label="Site">
+      <a href="#how" class="nav-link hide-sm">How it works</a>
+      <a href="/about" id="about-link" class="nav-link">About</a>
+      <a href="/explore" class="nav-cta">
+        Open the map
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+      <button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle dark/light mode">
+        <svg id="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="8" y1="1" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15"/><line x1="1" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15" y2="8"/><line x1="3.1" y1="3.1" x2="4.2" y2="4.2"/><line x1="11.8" y1="11.8" x2="12.9" y2="12.9"/><line x1="12.9" y1="3.1" x2="11.8" y2="4.2"/><line x1="4.2" y1="11.8" x2="3.1" y2="12.9"/></g></svg>
+        <svg id="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:none" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" fill="currentColor"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <!-- ── HERO: search first ─────────────────────────────────────── -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-inner">
+        <span class="hero-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+        </span>
+        <h1 id="hero-title">How well does a research effect hold up?</h1>
+        <p class="hero-lede">
+          Lighthouse gathers the foundational studies, replications, critiques, meta-analyses
+          and Wikipedia coverage for <strong data-total="effects">hundreds of</strong> research effects,
+          organised by field and discipline.
+        </p>
+
+        <form class="hero-search" id="hero-search" role="search" autocomplete="off">
+          <label for="hero-q" class="visually-hidden">Search effects and tags</label>
+          <svg class="hs-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg>
+          <input id="hero-q" type="search" placeholder="Try “mortality salience”, “priming” or “memory”"
+                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="hero-results">
+          <button type="submit" class="hs-btn">Search</button>
+          <div id="hero-results" class="hs-results" role="listbox" aria-label="Search results"></div>
+        </form>
+        <p class="hero-hint" id="hero-hint">Search by effect name, description or tag.</p>
+
+        <div class="or-divider" aria-hidden="true"><span>or</span></div>
+
+        <div class="path-cards">
+          <a class="path-card" href="/explore">
+            <span class="path-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><line x1="6" y1="7" x2="9.5" y2="10.5"/><line x1="18" y1="7" x2="14.5" y2="10.5"/><line x1="6" y1="17" x2="9.5" y2="13.5"/><line x1="18" y1="17" x2="14.5" y2="13.5"/></svg>
+            </span>
+            <span class="path-text">
+              <strong>Explore the map</strong>
+              <span>Drill down from field to discipline, cluster and effect</span>
+            </span>
+            <svg class="path-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+          <a class="path-card" href="#fields">
+            <span class="path-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            </span>
+            <span class="path-text">
+              <strong>Browse by field</strong>
+              <span>See every field and discipline at a glance</span>
+            </span>
+            <svg class="path-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── NUMBERS ────────────────────────────────────────────────── -->
+    <section class="stats" aria-label="Lighthouse in numbers">
+      <dl class="stats-inner" id="stats">
+        <div class="stat"><dt>Research effects</dt><dd data-total="effects">—</dd></div>
+        <div class="stat"><dt>Papers on record</dt><dd data-total="papers">—</dd></div>
+        <div class="stat"><dt>Wikipedia articles</dt><dd data-total="wikis">—</dd></div>
+        <div class="stat"><dt>Disciplines in <span data-total="fields">—</span> fields</dt><dd data-total="disciplines">—</dd></div>
+      </dl>
+    </section>
+
+    <!-- ── FIELDS ─────────────────────────────────────────────────── -->
+    <section class="section" id="fields" aria-labelledby="fields-title">
+      <div class="section-head">
+        <span class="eyebrow">Browse</span>
+        <h2 id="fields-title">Fields and disciplines</h2>
+        <p>Pick a field to open it on the map, or jump straight to a discipline.</p>
+      </div>
+      <div class="field-grid" id="field-grid" aria-busy="true">
+        <div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+      </div>
+    </section>
+
+    <!-- ── FEATURED EFFECTS ───────────────────────────────────────── -->
+    <section class="section section-alt" aria-labelledby="featured-title">
+      <div class="section-inner">
+        <div class="section-head">
+          <span class="eyebrow">Start here</span>
+          <h2 id="featured-title">Effects with the fullest evidence trail</h2>
+          <p>These effects have the widest mix of evidence on record: an original finding, attempts to replicate it, critiques and pooled analyses.</p>
+        </div>
+        <div class="effect-grid" id="effect-grid" aria-busy="true">
+          <div class="skeleton-card short"></div><div class="skeleton-card short"></div><div class="skeleton-card short"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── HOW IT WORKS ───────────────────────────────────────────── -->
+    <section class="section" id="how" aria-labelledby="how-title">
+      <div class="section-head">
+        <span class="eyebrow">How it works</span>
+        <h2 id="how-title">From a field to the evidence in three steps</h2>
+      </div>
+      <div class="how-grid">
+        <ol class="steps">
+          <li>
+            <span class="step-n" aria-hidden="true">1</span>
+            <div><h3>Pick a field</h3><p>Start from one of the fields, then choose a discipline inside it.</p></div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">2</span>
+            <div><h3>Narrow by cluster</h3><p>Disciplines are split into clusters of related effects, such as “Social influence” or “Memory”.</p></div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">3</span>
+            <div><h3>Read the timeline</h3><p>Open an effect to see its evidence in date order, from the original study to the latest replication or critique.</p></div>
+          </li>
+        </ol>
+
+        <div class="glossary" aria-labelledby="glossary-title">
+          <h3 id="glossary-title">Kinds of evidence</h3>
+          <dl>
+            <div><dt><span class="g-mark sq" style="--c:var(--type-foundational)"></span>Foundational</dt><dd>The original study that reported the effect.</dd></div>
+            <div><dt><span class="g-mark dia" style="--c:var(--type-replication)"></span>Replication</dt><dd>A new study that tests whether the finding holds with new data.</dd></div>
+            <div><dt><span class="g-mark ci" style="--c:var(--type-critique)"></span>Critique</dt><dd>A reanalysis or commentary that questions the finding.</dd></div>
+            <div><dt><span class="g-mark sq" style="--c:var(--type-meta)"></span>Meta-analysis</dt><dd>Results pooled across many studies.</dd></div>
+            <div><dt><span class="g-mark ci" style="--c:var(--type-wiki)"></span>Wikipedia</dt><dd>Public coverage of the effect.</dd></div>
+          </dl>
+          <p class="glossary-note">Foundational papers that were later retracted are flagged using the Retraction Watch database.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SOURCES + CTA ──────────────────────────────────────────── -->
+    <section class="section section-alt" aria-labelledby="sources-title">
+      <div class="section-inner">
+        <div class="section-head">
+          <span class="eyebrow">Data</span>
+          <h2 id="sources-title">Where the evidence comes from</h2>
+        </div>
+        <ul class="source-grid">
+          <li><a href="https://forrt.org/reversals/" target="_blank" rel="noopener"><strong>FORRT Replications and Reversals</strong><span>Effect descriptions and the original list Lighthouse grew from</span></a></li>
+          <li><a href="https://forrt.org/replication-hub/flora" target="_blank" rel="noopener"><strong>FLoRA</strong><span>FORRT Library of Reproduction and Replication Attempts</span></a></li>
+          <li><a href="https://retractiondatabase.org/RetractionSearch.aspx" target="_blank" rel="noopener"><strong>Retraction Watch</strong><span>Retraction flags, via Crossref</span></a></li>
+          <li><a href="https://www.wikipedia.org" target="_blank" rel="noopener"><strong>Wikipedia</strong><span>Articles linked to each effect</span></a></li>
+        </ul>
+
+        <div class="cta-band">
+          <div class="cta-note">
+            <span class="cta-badge">Prototype</span>
+            <p><strong>Lighthouse is a work in progress, and its data is not fully validated yet.</strong>
+              Know a study that belongs here? Suggest it, and help us coordinate entries for your discipline.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="btn-primary" href="/about#suggest-a-new-item">Suggest a new item</a>
+            <a class="btn-secondary" href="/about">About the project</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="footer">
+    <span>FORRT · Framework for Open and Reproducible Research Training</span>
+    <div>
+      <a href="/explore">Explore the map</a>
+      <a href="/about">About</a>
+      <a href="/about#suggest-a-new-item">Suggest a new item</a>
+    </div>
+  </footer>
+</div>
+
+<script src="/static/js/landing.js"></script>
+</body>
+</html>

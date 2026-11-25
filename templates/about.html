@@ -5,33 +5,45 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>About — FORRT Lighthouse</title>
 <link rel="icon" type="image/webp" href="/static/images/icon.webp">
+<link rel="stylesheet" href="/static/css/fonts.css">
+<link rel="stylesheet" href="/static/css/tokens.css">
 <link rel="stylesheet" href="/static/css/style.css">
 <link rel="stylesheet" href="/static/css/about.css">
 </head>
 <body>
+<a class="skip-link" href="#about-main">Skip to content</a>
 <div id="app">
   <header id="header">
     <div id="logo-wrap">
-      <a href="/" class="logo-link">
-        <img src="/static/images/logo.svg" alt="Lighthouse logo" height="30">
+      <a href="/" class="logo-link" aria-label="FORRT Lighthouse home">
+        <img src="/static/images/logo.svg" alt="FORRT" height="24">
+        <span class="logo-divider" aria-hidden="true"></span>
         <span class="logo-text">Lighthouse</span>
       </a>
     </div>
-    <div id="header-right">
+    <nav id="header-right" aria-label="Site">
       <a href="/" id="home-link" class="nav-link">Home</a>
-      <a href="/about" id="about-link" class="nav-link">About</a>
-      <button id="theme-toggle" aria-label="Toggle theme" title="Toggle dark/light mode">
-        <svg id="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="8" y1="1" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15"/><line x1="1" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15" y2="8"/><line x1="3.1" y1="3.1" x2="4.2" y2="4.2"/><line x1="11.8" y1="11.8" x2="12.9" y2="12.9"/><line x1="12.9" y1="3.1" x2="11.8" y2="4.2"/><line x1="4.2" y1="11.8" x2="3.1" y2="12.9"/></g></svg>
-        <svg id="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:none"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" fill="currentColor"/></svg>
+      <a href="/about" id="about-link" class="nav-link" aria-current="page">About</a>
+      <button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle dark/light mode">
+        <svg id="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="8" y1="1" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15"/><line x1="1" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15" y2="8"/><line x1="3.1" y1="3.1" x2="4.2" y2="4.2"/><line x1="11.8" y1="11.8" x2="12.9" y2="12.9"/><line x1="12.9" y1="3.1" x2="11.8" y2="4.2"/><line x1="4.2" y1="11.8" x2="3.1" y2="12.9"/></g></svg>
+        <svg id="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:none" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" fill="currentColor"/></svg>
       </button>
-    </div>
+    </nav>
   </header>
 
   <main id="about-main">
-    <div id="about-content">
+    <article id="about-content">
       {{ content | safe }}
-    </div>
+    </article>
   </main>
+
+  <footer id="footer">
+    <span>FORRT · Framework for Open and Reproducible Research Training</span>
+    <div>
+      <a href="/explore">Explore the map</a>
+      <a href="/about#suggest-a-new-item">Suggest a new item</a>
+    </div>
+  </footer>
 </div>
 
 <script>

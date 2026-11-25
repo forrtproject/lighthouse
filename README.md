@@ -33,14 +33,19 @@ lighthouse/
 ├── content/
 │   └── about.md            # Content of the About page (edit this to update it)
 ├── templates/
-│   ├── index.html          # Main app shell
+│   ├── landing.html        # Landing page at /  (search, fields, featured effects)
+│   ├── index.html          # Map explorer at /explore (accepts ?field=&discipline=&cluster=&effect=)
 │   └── about.html          # About page wrapper (layout only)
 ├── static/
 │   ├── css/
-│   │   ├── style.css       # All app styles
+│   │   ├── tokens.css      # FORRT design tokens (colours, type, spacing), light + dark
+│   │   ├── fonts.css       # Self-hosted Domine + Source Sans 3 (Replication Atlas pairing)
+│   │   ├── style.css       # All app styles, in the FLoRA Replication Atlas look
 │   │   └── about.css       # Styles specific to the About page
+│   ├── fonts/              # woff2 files (SIL Open Font License)
 │   └── js/
-│       └── app.js          # All frontend logic (visualization, navigation, search)
+│       ├── app.js          # Explorer logic (visualization, navigation, search, deep links)
+│       └── landing.js      # Landing page (overview cards, search combobox)
 └── FORRT_Lighthouse_Data.xlsx  # Source data (edit this, then run import_xlsx.py)
 ```
 

@@ -251,6 +251,73 @@ def get_effect(effect_id: str):
     return jsonify({**effect, "papers_and_wikis": combined, "foundational_retraction": foundational_retraction, "wikis": wikis})
 
 
+@api_bp.get("/overview")
+def overview():
+    """Totals, a per-field breakdown and the best-evidenced effects, for the landing page."""
+    store = _store()
+    related_wikis = lambda eid: [  # noqa: E731
+        w for w in store.wikis_for_effect(eid)
+        if (w.get("validation") or "").strip().lower() != "non-related"
+    ]
+
+    fields = []
+    for field, discs in store.fields.items():
+        disc_rows = []
+        for d in discs:
+            disc_rows.append({
+                "name": d,
+                "effect_count": len(store.effects_for(discipline=d)),
+                "cluster_count": len(store.clusters_for_discipline(d)),
+            })
+        fields.append({
+            "name": field,
+            "effect_count": sum(r["effect_count"] for r in disc_rows),
+            "disciplines": sorted(disc_rows, key=lambda r: -r["effect_count"]),
+        })
+    fields.sort(key=lambda f: -f["effect_count"])
+
+    def evidence(e: dict) -> dict:
+        papers = store.papers_for_effect(e["id"])
+        kinds: dict[str, int] = defaultdict(int)
+        for p in papers:
+            kinds[p.get("classification") or "other"] += 1
+        return {"papers": len(papers), "kinds": dict(kinds)}
+
+    scored = [(evidence(e), e) for e in store.effects if e.get("clusters")]
+    # Best starting points: the widest mix of evidence kinds, then the most papers.
+    scored.sort(key=lambda t: (-len(t[0]["kinds"]), -t[0]["papers"], t[1]["name"]))
+    featured = [
+        {
+            "id": e["id"],
+            "name": e["name"],
+            "field": e.get("field") or "Other",
+            "discipline": e["discipline"],
+            "cluster": e["clusters"][0],
+            **ev,
+        }
+        for ev, e in scored[:6]
+    ]
+
+    retracted = sum(
+        1 for e in store.effects
+        if any(p.get("classification") == "foundational" and p.get("retracted")
+               for p in store.papers_for_effect(e["id"]))
+    )
+
+    return jsonify({
+        "totals": {
+            "effects": len(store.effects),
+            "papers": len(store.papers),
+            "wikis": sum(len(related_wikis(e["id"])) for e in store.effects),
+            "fields": len(store.fields),
+            "disciplines": len(store.disciplines),
+            "retracted_foundational": retracted,
+        },
+        "fields": fields,
+        "featured": featured,
+    })
+
+
 @api_bp.get("/search")
 def search():
     q = request.args.get("q", "").strip()
@@ -274,6 +341,10 @@ def create_app(data_path: Path = DATA_PATH) -> Flask:
     flask_app.register_blueprint(api_bp)
 
     @flask_app.get("/")
+    def landing():
+        return render_template("landing.html")
+
+    @flask_app.get("/explore")
     def index():
         return render_template("index.html")
 
